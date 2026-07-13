@@ -16,7 +16,6 @@ class Settings(BaseSettings):
     OPEN_METEO_URL: str = "https://api.open-meteo.com/v1/forecast"
     
     # Events & Lineup APIs
-    BANDSINTOWN_APP_ID: str = "festival_planner_mvp"
     TICKETMASTER_API_KEY: Optional[str] = None
     SONGKICK_API_KEY: Optional[str] = None
     

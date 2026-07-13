@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.supabase import get_current_user
+from app.api.planner import router as planner_router
 
 app = FastAPI(
     title="Festival Planner API",
@@ -15,6 +16,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(planner_router, prefix="/api", tags=["Planner"])
 
 @app.get("/health")
 async def health_check():

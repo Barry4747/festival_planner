@@ -54,11 +54,11 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-950 text-white">
+      <div className="flex min-h-dvh items-center justify-center bg-[#090b0a]">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-sm font-medium tracking-wide text-slate-300">
-            Weryfikacja sesji w Supabase...
+          <div className="h-8 w-8 rounded-full border-2 border-white/10 border-t-emerald-500 animate-spin" />
+          <span className="text-xs font-medium text-slate-400">
+            Verifying session...
           </span>
         </div>
       </div>
