@@ -1,19 +1,7 @@
-from functools import lru_cache
 from typing import Optional, Dict, Any
 from fastapi import Header, HTTPException, status, Depends
-from supabase import create_client, Client
-from app.core.config import settings
-
-@lru_cache()
-def get_supabase() -> Client:
-    """
-    FastAPI Dependency Injection (DI) provider dla klienta Supabase.
-    Zwraca współdzieloną (cached) instancję klienta Supabase z kluczem SUPABASE_KEY (service_role).
-    """
-    if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
-        raise RuntimeError("Brakuje konfiguracji SUPABASE_URL lub SUPABASE_KEY w ustawieniach (.env)")
-    
-    return create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+from supabase import Client
+from app.db.database import get_supabase_client as get_supabase
 
 
 async def get_current_user(

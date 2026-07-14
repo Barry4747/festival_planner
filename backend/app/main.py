@@ -1,11 +1,19 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.supabase import get_current_user
-from app.api.planner import router as planner_router
+from app.api.routers import planner_router
+from app.db import init_db
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
 
 app = FastAPI(
     title="Festival Planner API",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Konfiguracja CORS pod frontend (Vite)
