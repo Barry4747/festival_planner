@@ -64,11 +64,6 @@ app/
 
 ## 🗺️ Roadmap
 
-### Phase 0: Project Initialization (1-2 days)
-- Set up Supabase project structure and database schemas.
-- Initialize FastAPI backend template and configure Docker Compose.
-- Connect Supabase Auth and configure the Postgres `pgvector` extension.
-
 ### Phase 1: MVP Release (1 week)
 - Implement basic CRUD operations for Trips.
 - Integrate the initial Bandsintown and Open-Meteo APIs.
