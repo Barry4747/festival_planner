@@ -2,6 +2,7 @@ import logging
 from typing import Dict, Any, Optional, List
 from langchain_core.messages import HumanMessage, AIMessage
 from app.agents.graph import planner_app
+from app.repositories import FestivalRepository
 
 logger = logging.getLogger(__name__)
 
@@ -9,14 +10,59 @@ logger = logging.getLogger(__name__)
 class FestivalConciergeService:
     """Service encapsulating AI LangGraph chatbot interactions and trip itinerary generation."""
 
+    def __init__(self, repository: Optional[FestivalRepository] = None):
+        self.repository = repository
+
+    async def get_chat_history_for_festival(
+        self, user_id: str, festival_id: str
+    ) -> List[Dict[str, Any]]:
+        """Fetch entity-bound historical chat messages ordered by created_at."""
+        if not self.repository:
+            return []
+        try:
+            thread = await self.repository.get_thread_by_user_and_festival(user_id, festival_id)
+            if not thread:
+                return []
+            thread_id = thread.get("id")
+            if not thread_id:
+                return []
+            return await self.repository.get_chat_messages_by_thread_id(str(thread_id))
+        except Exception as e:
+            logger.error(f"❌ [FestivalConciergeService] Error fetching history: {e}")
+            return []
+
     async def generate_chat_response(
         self,
         message: str,
+        festival_id: Optional[str] = None,
+        festival_context: Optional[Dict[str, Any]] = None,
         context: Optional[Dict[str, Any]] = None,
         history: Optional[List[Dict[str, Any]]] = None,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         messages_list = []
-        if history:
+        ctx = festival_context or context or {}
+        thread_id = None
+
+        # 1. Entity-bound history retrieval if user_id and festival_id are provided
+        if user_id and festival_id and self.repository:
+            try:
+                thread = await self.repository.get_or_create_thread(user_id, festival_id)
+                thread_id = thread.get("id")
+                if thread_id:
+                    existing_rows = await self.repository.get_chat_messages_by_thread_id(str(thread_id))
+                    for row in existing_rows:
+                        role = row.get("role")
+                        content = row.get("content", "")
+                        if role == "user":
+                            messages_list.append(HumanMessage(content=content))
+                        elif role == "assistant":
+                            messages_list.append(AIMessage(content=content))
+            except Exception as e:
+                logger.error(f"⚠️ [FestivalConciergeService] Could not load entity-bound thread/messages: {e}")
+
+        # If no entity-bound thread loaded, fallback to payload history
+        if not messages_list and history:
             for m in history:
                 role = m.get("role") or m.get("type", "user")
                 content = m.get("content", "")
@@ -25,11 +71,12 @@ class FestivalConciergeService:
                 elif role in ("assistant", "ai"):
                     messages_list.append(AIMessage(content=content))
 
+        # Append new user prompt
         messages_list.append(HumanMessage(content=message))
 
         initial_state = {
             "messages": messages_list,
-            "context": context or {}
+            "context": ctx
         }
         result = await planner_app.ainvoke(initial_state)
         messages = result.get("messages", [])
@@ -42,10 +89,20 @@ class FestivalConciergeService:
             ai_msg = messages[-1]
 
         ai_content = getattr(ai_msg, "content", "") if ai_msg else "I couldn't generate a response."
+
+        # 2. Persist new prompt & AI response in entity-bound thread if available
+        if thread_id and self.repository:
+            try:
+                await self.repository.insert_chat_message(str(thread_id), "user", message)
+                await self.repository.insert_chat_message(str(thread_id), "assistant", ai_content)
+            except Exception as e:
+                logger.error(f"⚠️ [FestivalConciergeService] Failed inserting messages to DB: {e}")
+
         return {
             "reply": ai_content,
             "content": ai_content,
-            "context": context
+            "context": ctx,
+            "thread_id": thread_id,
         }
 
     async def generate_trip_itinerary(

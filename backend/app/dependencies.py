@@ -38,6 +38,8 @@ def get_discovery_service(
     return FestivalDiscoveryService(aggregator)
 
 
-def get_concierge_service() -> FestivalConciergeService:
+def get_concierge_service(
+    repository: FestivalRepository = Depends(get_festival_repository),
+) -> FestivalConciergeService:
     """FastAPI DI provider for FestivalConciergeService."""
-    return FestivalConciergeService()
+    return FestivalConciergeService(repository)

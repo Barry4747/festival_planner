@@ -75,20 +75,6 @@ async def get_festivals_map(
     )
 
 
-@router.post("/chat")
-async def chat_endpoint(
-    request: ChatRequest,
-    service: FestivalConciergeService = Depends(get_concierge_service),
-):
-    """
-    Generative AI Chatbot Concierge endpoint. Accepts a user message and optional context
-    about the festival currently selected on the map.
-    """
-    return await service.generate_chat_response(
-        message=request.message, context=request.context, history=request.history
-    )
-
-
 @router.post("/plan-trip")
 async def plan_trip(
     trip_details: TripDetailsModel,

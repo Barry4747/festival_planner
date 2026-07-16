@@ -37,12 +37,13 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
       id: 'welcome-init',
       role: 'ai',
       content:
-        '👋 **Welcome to your AI Festival Concierge!**\n\nClick any festival pin on the map to select it, or ask me anything about lineups, travel logistics, budgets, and European music events.',
+        '👋 **Welcome to your AI Festival Concierge!**\n\nClick any festival pin on the map to select it and open its dedicated entity-bound chat thread, or ask me anything generally about European music events.',
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -51,26 +52,81 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, loading]);
+  }, [messages, loading, isLoadingHistory]);
 
-  // If a festival is selected, optionally suggest context in chat or alert user
+  // Entity-Bound Chat History: fetch history when selectedFestival changes
   useEffect(() => {
-    if (selectedFestival) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `sys-context-${Date.now()}`,
-          role: 'ai',
-          content: `🎯 **Concierge Context Updated:** Now focusing on **${selectedFestival.name}**${selectedFestival.dates ? ` (${selectedFestival.dates})` : ''}. How can I assist your trip planning for this event?`,
-          timestamp: new Date(),
-        },
-      ]);
-    }
+    let isMounted = true;
+
+    const fetchEntityChatHistory = async () => {
+      if (!selectedFestival) {
+        if (isMounted) {
+          setMessages([
+            {
+              id: 'welcome-init',
+              role: 'ai',
+              content:
+                '👋 **Welcome to your AI Festival Concierge!**\n\nClick any festival pin on the map to select it and open its dedicated entity-bound chat thread, or ask me anything generally about European music events.',
+              timestamp: new Date(),
+            },
+          ]);
+        }
+        return;
+      }
+
+      setIsLoadingHistory(true);
+      try {
+        const response = await api.get(`/api/chat/history/${selectedFestival.id}`);
+        if (!isMounted) return;
+
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          const loadedHistory: ChatMessage[] = response.data.map((row: any) => ({
+            id: String(row.id || `msg-${Math.random()}`),
+            role: row.role === 'assistant' ? 'ai' : row.role === 'user' ? 'user' : 'ai',
+            content: String(row.content || ''),
+            timestamp: row.created_at ? new Date(row.created_at) : new Date(),
+          }));
+          setMessages(loadedHistory);
+        } else {
+          // Empty thread -> initialize with entity context welcome message
+          setMessages([
+            {
+              id: `welcome-festival-${selectedFestival.id}`,
+              role: 'ai',
+              content: `👋 **Dedicated Concierge Thread: ${selectedFestival.name}**\n\nI have loaded the exact context and coordinates for this festival${selectedFestival.dates ? ` (${selectedFestival.dates})` : ''}. Ask me anything about lineups, tickets, travel routes, or budgeting specifically for this event!`,
+              timestamp: new Date(),
+            },
+          ]);
+        }
+      } catch (err: any) {
+        console.error('❌ Error fetching entity-bound chat history:', err);
+        if (isMounted) {
+          setMessages([
+            {
+              id: `welcome-festival-fallback-${selectedFestival.id}`,
+              role: 'ai',
+              content: `👋 **Concierge Context: ${selectedFestival.name}**\n\nHow can I assist your trip planning for **${selectedFestival.name}**?`,
+              timestamp: new Date(),
+            },
+          ]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingHistory(false);
+        }
+      }
+    };
+
+    fetchEntityChatHistory();
+
+    return () => {
+      isMounted = false;
+    };
   }, [selectedFestival?.id]);
 
   const handleSendMessage = async (customText?: string) => {
     const textToSend = customText || input;
-    if (!textToSend.trim() || loading) return;
+    if (!textToSend.trim() || loading || isLoadingHistory) return;
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -84,14 +140,16 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
     setLoading(true);
 
     try {
-      // Prepare history payload for API
+      // Prepare history payload as fallback / context
       const historyPayload = messages.map((m) => ({
-        role: m.role,
+        role: m.role === 'ai' ? 'assistant' : m.role,
         content: m.content,
       }));
 
       const response = await api.post('/api/chat', {
         message: textToSend,
+        festival_id: selectedFestival ? String(selectedFestival.id) : undefined,
+        festival_context: selectedFestival || null,
         context: selectedFestival || null,
         history: historyPayload,
       });
@@ -115,7 +173,7 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
         id: `err-${Date.now()}`,
         role: 'ai',
         content: `⚠️ **Concierge Error:** ${
-          err.response?.data?.detail || err.message || 'Could not connect to the Gemini AI backend.'
+          err.response?.data?.detail || err.message || 'Could not connect to the AI backend.'
         }`,
         timestamp: new Date(),
       };
@@ -130,7 +188,9 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
       {
         id: `welcome-reset-${Date.now()}`,
         role: 'ai',
-        content: '🧹 Chat history cleared. Ready for your next question!',
+        content: selectedFestival
+          ? `🧹 Thread view cleared for ${selectedFestival.name}. Ask another question!`
+          : '🧹 Chat history cleared. Ready for your next question!',
         timestamp: new Date(),
       },
     ]);
@@ -262,6 +322,18 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
         })}
 
         {/* Loading Indicator */}
+        {isLoadingHistory && (
+          <div className="flex items-start gap-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[#181c19] text-emerald-400 border border-white/10">
+              <Bot className="h-3.5 w-3.5" />
+            </div>
+            <div className="flex items-center gap-2.5 rounded-2xl rounded-tl-none border border-white/10 bg-[#141816] px-4 py-3 text-xs text-slate-400">
+              <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+              <span>Loading dedicated chat history for {selectedFestival?.name}...</span>
+            </div>
+          </div>
+        )}
+
         {loading && (
           <div className="flex items-start gap-3">
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[#181c19] text-emerald-400 border border-white/10">
@@ -286,7 +358,7 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
               key={idx}
               type="button"
               onClick={() => handleSendMessage(prompt)}
-              disabled={loading}
+              disabled={loading || isLoadingHistory}
               className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-slate-300 hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-300 transition-all disabled:opacity-50"
             >
               {prompt}
@@ -309,16 +381,18 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              selectedFestival
-                ? `Ask anything about ${selectedFestival.name}...`
-                : 'Ask your AI Concierge (lineups, routes, budgets)...'
+              isLoadingHistory
+                ? 'Loading history...'
+                : selectedFestival
+                  ? `Ask anything about ${selectedFestival.name}...`
+                  : 'Ask your AI Concierge (lineups, routes, budgets)...'
             }
-            disabled={loading}
+            disabled={loading || isLoadingHistory}
             className="flex-1 rounded-xl border border-white/10 bg-[#181c19] px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 disabled:opacity-50 transition-all"
           />
           <button
             type="submit"
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || loading || isLoadingHistory}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-black font-semibold shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
             {loading ? (

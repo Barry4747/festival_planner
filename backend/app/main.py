@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.supabase import get_current_user
-from app.api.routers import planner_router
+from app.api.routers import planner_router, chat_router
 from app.db import init_db
 
 @asynccontextmanager
@@ -26,6 +26,7 @@ app.add_middleware(
 )
 
 app.include_router(planner_router, prefix="/api", tags=["Planner"])
+app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
 
 @app.get("/health")
 async def health_check():

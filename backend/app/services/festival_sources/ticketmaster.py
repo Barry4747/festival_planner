@@ -27,8 +27,9 @@ class TicketmasterSource(BaseFestivalSource):
                 keyword="festival",
                 segment_id="KZFzniwnSyZfZ7v7nJ",
                 latlong=f"{lat},{lng}",
-                radius=radius_km,
+                radius=int(round(float(radius_km))),
                 unit="km",
+                country_code=None,
                 start_date_time=start_date,
                 end_date_time=end_date,
                 size=50

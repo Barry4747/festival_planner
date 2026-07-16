@@ -135,22 +135,35 @@ class TicketmasterClient:
             "page": page,
             "size": size
         }
-        if country_code and country_code.strip() and country_code.strip().lower() != "all":
-            params["countryCode"] = country_code.strip().upper()
         if keyword and keyword.strip():
             params["keyword"] = keyword.strip()
-        if city and city.strip():
-            params["city"] = city.strip()
-        if latlong and latlong.strip():
-            params["latlong"] = latlong.strip()
-        if radius is not None:
-            params["radius"] = str(radius)
-            params["unit"] = unit or "km"
         if classification_name and classification_name.strip():
             params["classificationName"] = classification_name.strip()
         if segment_id and segment_id.strip():
             params["segmentId"] = segment_id.strip()
-        
+
+        if latlong and latlong.strip():
+            # Kiedy wyszukujemy po współrzędnych (latlong), Ticketmaster API zwraca błąd 400 Bad Request,
+            # jeśli jednocześnie podane jest countryCode lub jeśli radius ma format zmiennoprzecinkowy z kropek (np. "500.0").
+            params["latlong"] = latlong.strip()
+            if radius is not None:
+                try:
+                    params["radius"] = str(int(round(float(radius))))
+                except (ValueError, TypeError):
+                    params["radius"] = str(radius)
+                params["unit"] = unit or "km"
+        else:
+            if country_code and country_code.strip() and country_code.strip().lower() != "all":
+                params["countryCode"] = country_code.strip().upper()
+            if city and city.strip():
+                params["city"] = city.strip()
+            if radius is not None:
+                try:
+                    params["radius"] = str(int(round(float(radius))))
+                except (ValueError, TypeError):
+                    params["radius"] = str(radius)
+                params["unit"] = unit or "km"
+
         start_iso = cls._format_to_iso8601(start_date_time, is_end_of_day=False)
         end_iso = cls._format_to_iso8601(end_date_time, is_end_of_day=True)
         if start_iso:

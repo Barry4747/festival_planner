@@ -101,3 +101,84 @@ class FestivalRepository:
             start_date,
             end_date,
         )
+
+    def _sync_get_thread_by_user_and_festival(
+        self, user_id: str, festival_id: str
+    ) -> Optional[Dict[str, Any]]:
+        response = (
+            self.client.table("threads")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("festival_id", str(festival_id))
+            .execute()
+        )
+        rows = (
+            response.data
+            if response and hasattr(response, "data") and isinstance(response.data, list)
+            else []
+        )
+        return rows[0] if rows else None
+
+    async def get_thread_by_user_and_festival(
+        self, user_id: str, festival_id: str
+    ) -> Optional[Dict[str, Any]]:
+        return await asyncio.to_thread(
+            self._sync_get_thread_by_user_and_festival, user_id, festival_id
+        )
+
+    def _sync_create_thread(self, user_id: str, festival_id: str) -> Dict[str, Any]:
+        payload = {"user_id": user_id, "festival_id": str(festival_id)}
+        response = self.client.table("threads").insert(payload).execute()
+        rows = (
+            response.data
+            if response and hasattr(response, "data") and isinstance(response.data, list) and len(response.data) > 0
+            else []
+        )
+        if rows:
+            return rows[0]
+        existing = self._sync_get_thread_by_user_and_festival(user_id, festival_id)
+        return existing or {"user_id": user_id, "festival_id": str(festival_id)}
+
+    async def create_thread(self, user_id: str, festival_id: str) -> Dict[str, Any]:
+        return await asyncio.to_thread(self._sync_create_thread, user_id, festival_id)
+
+    async def get_or_create_thread(self, user_id: str, festival_id: str) -> Dict[str, Any]:
+        thread = await self.get_thread_by_user_and_festival(user_id, festival_id)
+        if not thread:
+            thread = await self.create_thread(user_id, festival_id)
+        return thread
+
+    def _sync_get_chat_messages_by_thread_id(self, thread_id: str) -> List[Dict[str, Any]]:
+        response = (
+            self.client.table("chat_messages")
+            .select("*")
+            .eq("thread_id", str(thread_id))
+            .order("created_at", desc=False)
+            .execute()
+        )
+        rows = (
+            response.data
+            if response and hasattr(response, "data") and isinstance(response.data, list)
+            else []
+        )
+        return rows
+
+    async def get_chat_messages_by_thread_id(self, thread_id: str) -> List[Dict[str, Any]]:
+        return await asyncio.to_thread(self._sync_get_chat_messages_by_thread_id, thread_id)
+
+    def _sync_insert_chat_message(
+        self, thread_id: str, role: str, content: str
+    ) -> Dict[str, Any]:
+        payload = {"thread_id": str(thread_id), "role": role, "content": content}
+        response = self.client.table("chat_messages").insert(payload).execute()
+        rows = (
+            response.data
+            if response and hasattr(response, "data") and isinstance(response.data, list) and len(response.data) > 0
+            else [{}]
+        )
+        return rows[0]
+
+    async def insert_chat_message(
+        self, thread_id: str, role: str, content: str
+    ) -> Dict[str, Any]:
+        return await asyncio.to_thread(self._sync_insert_chat_message, thread_id, role, content)
