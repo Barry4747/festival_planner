@@ -22,18 +22,39 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
   const location = useLocation();
 
   useEffect(() => {
-    // 1. Pobranie początkowego stanu sesji
+    let isMounted = true;
+
+    // 1. Pobranie początkowego stanu sesji oraz proaktywne odświeżenie jeśli wygasa
     const fetchSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) {
           console.error('❌ Błąd pobierania sesji w AuthGuard:', error);
         }
-        setSession(session);
+
+        if (session && isMounted) {
+          const now = Math.round(Date.now() / 1000);
+          // Jeśli token wygasa za mniej niż 3 minuty, natychmiast odświeżamy sesję
+          if (session.expires_at && session.expires_at <= now + 180) {
+            console.info('🔄 [AuthGuard] Token bliski wygaśnięcia podczas wejścia na stronę. Odświeżam sesję...');
+            const { data: refreshedData } = await supabase.auth.refreshSession();
+            if (refreshedData.session && isMounted) {
+              setSession(refreshedData.session);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
+        if (isMounted) {
+          setSession(session);
+        }
       } catch (err) {
         console.error('❌ Wyjątek AuthGuard fetchSession:', err);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -42,12 +63,32 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
     // 2. Nasłuchiwanie na zmiany (np. zalogowanie w innej karcie lub wygaśnięcie tokenu)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, currentSession) => {
-        setSession(currentSession);
-        setLoading(false);
+        if (isMounted) {
+          setSession(currentSession);
+          setLoading(false);
+        }
       }
     );
 
+    // 3. Okresowy strażnik sesji (zabezpiecza przed wygaśnięciem przy długim otwarciu karty)
+    const refreshInterval = setInterval(async () => {
+      try {
+        const { data: { session: current } } = await supabase.auth.getSession();
+        if (current) {
+          const now = Math.round(Date.now() / 1000);
+          if (current.expires_at && current.expires_at <= now + 300) {
+            console.info('🔄 [AuthGuard Strażnik] Odświeżam sesję w tle przed upływem ważności...');
+            await supabase.auth.refreshSession();
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Błąd okresowego odświeżania sesji w tle:', e);
+      }
+    }, 3 * 60 * 1000); // Sprawdzenie co 3 minuty
+
     return () => {
+      isMounted = false;
+      clearInterval(refreshInterval);
       subscription.unsubscribe();
     };
   }, []);
