@@ -15,6 +15,9 @@ import {
 interface AIChatProps {
   selectedFestival: FestivalItem | null;
   onClearSelection?: () => void;
+  onMinimize?: () => void;
+  onClose?: () => void;
+  setRouteCoordinates?: (coords: [number, number][] | null) => void;
 }
 
 interface ChatMessage {
@@ -31,7 +34,34 @@ const QUICK_PROMPTS = [
   'Recommend camping vs hotel accommodation nearby.',
 ];
 
-export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelection }) => {
+const formatMessageContent = (raw: any): string => {
+  if (raw === null || raw === undefined) return '';
+  if (typeof raw === 'string') return raw;
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object' && item !== null) {
+          return item.text || item.content || JSON.stringify(item);
+        }
+        return String(item);
+      })
+      .join('\n');
+  }
+  if (typeof raw === 'object') {
+    if (raw.text || raw.content || raw.reply || raw.message) {
+      return String(raw.text || raw.content || raw.reply || raw.message);
+    }
+    try {
+      return JSON.stringify(raw, null, 2);
+    } catch {
+      return String(raw);
+    }
+  }
+  return String(raw);
+};
+
+export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelection, onMinimize, onClose, setRouteCoordinates }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome-init',
@@ -83,7 +113,7 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
           const loadedHistory: ChatMessage[] = response.data.map((row: any) => ({
             id: String(row.id || `msg-${Math.random()}`),
             role: row.role === 'assistant' ? 'ai' : row.role === 'user' ? 'user' : 'ai',
-            content: String(row.content || ''),
+            content: formatMessageContent(row.content),
             timestamp: row.created_at ? new Date(row.created_at) : new Date(),
           }));
           setMessages(loadedHistory);
@@ -154,10 +184,19 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
         history: historyPayload,
       });
 
-      const replyText =
+      if (setRouteCoordinates) {
+        if (response.data?.route_geometry && Array.isArray(response.data.route_geometry) && response.data.route_geometry.length > 0) {
+          setRouteCoordinates(response.data.route_geometry);
+        } else {
+          setRouteCoordinates(null);
+        }
+      }
+
+      const replyText = formatMessageContent(
         response.data?.reply ||
         response.data?.content ||
-        'I am sorry, I could not synthesize a response right now.';
+        'I am sorry, I could not synthesize a response right now.'
+      );
 
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
@@ -199,32 +238,56 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#111412] shadow-xl">
       {/* ── TOP HEADER ── */}
-      <div className="flex items-center justify-between border-b border-white/10 bg-[#0d0f0e] p-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
+      <div className="flex items-center justify-between border-b border-white/10 bg-[#0d0f0e] p-3.5">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
             <Bot className="h-4 w-4" />
           </div>
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wider text-white flex items-center gap-1.5">
-              <span>AI Concierge & Chatbot</span>
-              <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
-                LangGraph + Gemini
+              <span>AI Concierge</span>
+              <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400">
+                Live
               </span>
             </h2>
-            <p className="text-[11px] text-slate-400">
-              Interactive generative assistance & itinerary planner
+            <p className="text-[10px] text-slate-400 leading-none mt-0.5">
+              Entity-bound AI assistant
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleClearHistory}
-          className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-400 hover:border-white/20 hover:text-white transition-all"
-          title="Clear chat history"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleClearHistory}
+            className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-400 hover:border-white/20 hover:text-white transition-all"
+            title="Clear chat history"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+          {onMinimize && (
+            <button
+              type="button"
+              onClick={onMinimize}
+              className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-300 hover:bg-emerald-500 hover:text-black transition-all"
+              title="Minimize chat window"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+              </svg>
+            </button>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-300 hover:bg-red-500 hover:text-white transition-all"
+              title="Close chat"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── BANNER: SELECTED FESTIVAL CONTEXT ── */}
@@ -304,7 +367,7 @@ export const AIChat: React.FC<AIChatProps> = ({ selectedFestival, onClearSelecti
                     : 'bg-[#141816] text-slate-200 border border-white/10 rounded-tl-none ai-prose'
                 }`}
               >
-                {msg.content.split('\n').map((line, idx) => (
+                {formatMessageContent(msg.content).split('\n').map((line, idx) => (
                   <p key={idx} className={line === '' ? 'mt-2' : ''}>
                     {line}
                   </p>

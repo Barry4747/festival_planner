@@ -1,7 +1,6 @@
 import logging
 from typing import Dict, Any, Optional, List
 from langchain_core.messages import HumanMessage, AIMessage
-from app.agents.graph import planner_app
 from app.repositories import FestivalRepository
 
 logger = logging.getLogger(__name__)
@@ -78,6 +77,7 @@ class FestivalConciergeService:
             "messages": messages_list,
             "context": ctx
         }
+        from app.agents.graph import planner_app
         result = await planner_app.ainvoke(initial_state)
         messages = result.get("messages", [])
         ai_msg = None
@@ -88,7 +88,37 @@ class FestivalConciergeService:
         if not ai_msg and messages:
             ai_msg = messages[-1]
 
+        route_geometry = None
+        for m in reversed(messages):
+            m_type = getattr(m, "type", "") or type(m).__name__
+            m_name = getattr(m, "name", "")
+            if m_type in ("tool", "ToolMessage") or m_name == "get_travel_options":
+                m_content = getattr(m, "content", "")
+                if isinstance(m_content, str) and "car_option" in m_content and "geometry" in m_content:
+                    try:
+                        import json
+                        tool_data = json.loads(m_content)
+                        if isinstance(tool_data, dict) and "car_option" in tool_data:
+                            geom = tool_data["car_option"].get("geometry")
+                            if isinstance(geom, list) and len(geom) > 0:
+                                route_geometry = geom
+                                break
+                    except Exception as e:
+                        logger.debug(f"Could not parse tool message for route_geometry: {e}")
+
         ai_content = getattr(ai_msg, "content", "") if ai_msg else "I couldn't generate a response."
+        if isinstance(ai_content, list):
+            texts = []
+            for item in ai_content:
+                if isinstance(item, dict) and "text" in item:
+                    texts.append(str(item["text"]))
+                elif isinstance(item, str):
+                    texts.append(item)
+                else:
+                    texts.append(str(item))
+            ai_content = "\n".join(texts)
+        elif not isinstance(ai_content, str):
+            ai_content = str(ai_content)
 
         # 2. Persist new prompt & AI response in entity-bound thread if available
         if thread_id and self.repository:
@@ -103,6 +133,7 @@ class FestivalConciergeService:
             "content": ai_content,
             "context": ctx,
             "thread_id": thread_id,
+            "route_geometry": route_geometry,
         }
 
     async def generate_trip_itinerary(
@@ -131,6 +162,7 @@ class FestivalConciergeService:
             "messages": [initial_human_msg],
             "context": context
         }
+        from app.agents.graph import planner_app
         result = await planner_app.ainvoke(initial_state)
         messages = result.get("messages", [])
         ai_msg = None
@@ -142,6 +174,18 @@ class FestivalConciergeService:
             ai_msg = messages[-1]
 
         ai_content = getattr(ai_msg, "content", "") if ai_msg else "No itinerary generated."
+        if isinstance(ai_content, list):
+            texts = []
+            for item in ai_content:
+                if isinstance(item, dict) and "text" in item:
+                    texts.append(str(item["text"]))
+                elif isinstance(item, str):
+                    texts.append(item)
+                else:
+                    texts.append(str(item))
+            ai_content = "\n".join(texts)
+        elif not isinstance(ai_content, str):
+            ai_content = str(ai_content)
 
         raw_festivals = result.get("discovered_festivals", [])
         formatted_festivals = []

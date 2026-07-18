@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, CircleMarker, Tooltip, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { api } from '../lib/axios';
 import {
@@ -74,8 +74,48 @@ const MapRecenter: React.FC<{ center: [number, number] }> = ({ center }) => {
   return null;
 };
 
+// Route bounding controller when routeCoordinates or transportData change
+const RouteFitter: React.FC<{
+  routeCoordinates?: [number, number][] | null;
+  transportData?: TransportRoutesData | null;
+  activeTransportMode?: 'car' | 'train';
+  selectedTrainIndex?: number;
+}> = ({ routeCoordinates, transportData, activeTransportMode, selectedTrainIndex = 0 }) => {
+  const map = useMap();
+  useEffect(() => {
+    try {
+      if (transportData) {
+        if (activeTransportMode === 'car' && transportData.car?.geometry?.length > 0) {
+          map.fitBounds(transportData.car.geometry, { padding: [60, 60] });
+          return;
+        } else if (activeTransportMode === 'train' && transportData.train) {
+          const activeJourney = transportData.train.itineraries[selectedTrainIndex] || transportData.train.itineraries[0];
+          if (activeJourney?.path_coordinates && activeJourney.path_coordinates.length > 0) {
+            map.fitBounds(activeJourney.path_coordinates, { padding: [60, 60] });
+            return;
+          }
+          const pts: [number, number][] = [];
+          if (transportData.train.origin_coords) pts.push(transportData.train.origin_coords);
+          if (transportData.train.dest_coords) pts.push(transportData.train.dest_coords);
+          if (pts.length > 0) {
+            map.fitBounds(pts, { padding: [60, 60] });
+            return;
+          }
+        }
+      }
+      if (routeCoordinates && routeCoordinates.length > 0) {
+        map.fitBounds(routeCoordinates, { padding: [50, 50] });
+      }
+    } catch (e) {
+      console.error("RouteFitter fitBounds error:", e);
+    }
+  }, [routeCoordinates, transportData, activeTransportMode, selectedTrainIndex, map]);
+  return null;
+};
+
 import type { Festival } from '../types';
 import { SuggestFestivalModal } from './SuggestFestivalModal';
+import type { TransportRoutesData } from './LogisticsPanel';
 
 export type FestivalItem = Festival;
 
@@ -83,6 +123,12 @@ interface DiscoveryMapProps {
   selectedFestival: FestivalItem | null;
   onSelectFestival: (festival: FestivalItem | null) => void;
   onOpenSuggestModal?: () => void;
+  onFestivalsLoaded?: (festivals: FestivalItem[]) => void;
+  onLoadingChange?: (loading: boolean) => void;
+  routeCoordinates?: [number, number][] | null;
+  transportData?: TransportRoutesData | null;
+  activeTransportMode?: 'car' | 'train';
+  selectedTrainIndex?: number;
 }
 
 const RADIUS_PRESETS = [50, 100, 250, 500];
@@ -91,6 +137,12 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
   selectedFestival,
   onSelectFestival,
   onOpenSuggestModal,
+  onFestivalsLoaded,
+  onLoadingChange,
+  routeCoordinates,
+  transportData,
+  activeTransportMode,
+  selectedTrainIndex = 0,
 }) => {
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState<boolean>(false);
   // Default pin: Warsaw / Central Poland
@@ -106,6 +158,7 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
 
   const fetchFestivals = async (lat: number, lng: number, radius: number, start: string, end: string) => {
     setLoading(true);
+    if (onLoadingChange) onLoadingChange(true);
     setError(null);
     try {
       const params: any = {
@@ -121,11 +174,13 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
         ? response.data
         : response.data?.festivals || [];
       setFestivals(items);
+      if (onFestivalsLoaded) onFestivalsLoaded(items);
     } catch (err: any) {
       console.error('Failed to fetch map festivals:', err);
       setError('Could not load festivals for this location.');
     } finally {
       setLoading(false);
+      if (onLoadingChange) onLoadingChange(false);
     }
   };
 
@@ -279,6 +334,95 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
 
           {/* Recenter viewport when pin changes */}
           <MapRecenter center={[pin.lat, pin.lng]} />
+
+          {/* Render route polyline and fit bounds if travel route or transport data exists */}
+          <RouteFitter
+            routeCoordinates={routeCoordinates}
+            transportData={transportData}
+            activeTransportMode={activeTransportMode}
+            selectedTrainIndex={selectedTrainIndex}
+          />
+
+          {/* Car Route from Logistics Panel */}
+          {transportData && activeTransportMode === 'car' && transportData.car.geometry && (
+            <Polyline positions={transportData.car.geometry} color="#3b82f6" weight={5} opacity={0.85} />
+          )}
+
+          {/* Train Route & Stations from Logistics Panel */}
+          {transportData && activeTransportMode === 'train' && transportData.train && (() => {
+            const activeJourney = transportData.train.itineraries[selectedTrainIndex] || transportData.train.itineraries[0];
+            if (!activeJourney) return null;
+
+            const pathCoords = activeJourney.path_coordinates && activeJourney.path_coordinates.length > 0
+              ? activeJourney.path_coordinates
+              : [transportData.train.origin_coords, transportData.train.dest_coords];
+
+            const legs = activeJourney.legs || [];
+
+            return (
+              <React.Fragment key={`train-route-${selectedTrainIndex}`}>
+                <Polyline
+                  positions={pathCoords}
+                  color="#ef4444"
+                  weight={5}
+                  dashArray="6, 10"
+                  opacity={0.85}
+                />
+
+                {legs.map((leg, legIdx) => {
+                  const isFirst = legIdx === 0;
+                  const isLast = legIdx === legs.length - 1;
+
+                  return (
+                    <React.Fragment key={`leg-${legIdx}`}>
+                      {/* Origin / Transfer Station Marker for this Leg */}
+                      <CircleMarker
+                        center={[leg.origin.lat, leg.origin.lng]}
+                        radius={isFirst ? 8 : 7}
+                        pathOptions={{
+                          color: '#ffffff',
+                          fillColor: isFirst ? '#3b82f6' : '#f59e0b',
+                          fillOpacity: 1,
+                          weight: 2,
+                        }}
+                      >
+                        <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
+                          <span className="font-sans text-xs font-bold text-slate-900">
+                            {isFirst ? '🚆 Start: ' : '🔄 Transfer: '} {leg.origin.name} ({leg.departure})
+                          </span>
+                        </Tooltip>
+                      </CircleMarker>
+
+                      {/* Destination Station Marker (rendered explicitly for final leg) */}
+                      {isLast && (
+                        <CircleMarker
+                          center={[leg.destination.lat, leg.destination.lng]}
+                          radius={8}
+                          pathOptions={{
+                            color: '#ffffff',
+                            fillColor: '#10b981',
+                            fillOpacity: 1,
+                            weight: 2,
+                          }}
+                        >
+                          <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
+                            <span className="font-sans text-xs font-bold text-slate-900">
+                              🏁 Arrival: {leg.destination.name} ({leg.arrival})
+                            </span>
+                          </Tooltip>
+                        </CircleMarker>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </React.Fragment>
+            );
+          })()}
+
+          {/* Fallback AI Chat Polyline when no explicit Logistics Panel data is active */}
+          {!transportData && routeCoordinates && routeCoordinates.length > 0 && (
+            <Polyline positions={routeCoordinates} color="#3b82f6" weight={5} opacity={0.7} />
+          )}
 
           {/* Search Center Circle overlay */}
           <Circle

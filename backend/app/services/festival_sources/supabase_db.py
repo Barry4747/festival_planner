@@ -73,10 +73,15 @@ class SupabaseSource(BaseFestivalSource):
                 start_dt = str(row.get("start_date") or "")
                 end_dt = str(row.get("end_date") or start_dt)
                 img_url = str(row.get("image_url") or "")
+                city_str = str(row.get("city") or row.get("location") or "Europe")
+                genre_str = str(row.get("genre") or row.get("category") or "Niche / Exclusive")
 
                 results.append({
                     "id": f"local_{row.get('id')}",
                     "name": str(row.get("name") or "Proprietary European Festival"),
+                    "city": city_str,
+                    "genre": genre_str,
+                    "category": genre_str,
                     "lat": row_lat,
                     "lng": row_lng,
                     "coordinates": {"lat": row_lat, "lng": row_lng},

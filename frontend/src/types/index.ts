@@ -8,6 +8,11 @@ export interface Festival {
   source_name: string;
   url?: string;
   image_url?: string;
+  city?: string;
+  genre?: string;
+  category?: string;
+  sources?: Array<{ source_name: string; url: string }>;
+  coordinates?: { lat: number; lng: number };
   // Backward compatibility properties for UI convenience
   dates?: string;
   image?: string;

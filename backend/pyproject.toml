@@ -13,6 +13,7 @@ dependencies = [
     "langgraph>=1.2.9",
     "levenshtein>=0.27.3",
     "pydantic-settings>=2.14.2",
+    "pyhafas>=0.4.0",
     "redis>=8.0.1",
     "supabase>=2.31.0",
     "thefuzz>=0.22.1",

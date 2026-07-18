@@ -107,7 +107,7 @@ def init_db():
     """Verify Supabase client initialization at application startup."""
     try:
         get_supabase_client()
-        print("⚡ [SUPABASE DB] Initialized Supabase client successfully.")
+        print("[SUPABASE DB] Initialized Supabase client successfully.")
     except Exception as e:
-        print(f"⚠️ [SUPABASE DB] Warning during Supabase client initialization: {e}")
+        print(f"[SUPABASE DB] Warning during Supabase client initialization: {e}")
 

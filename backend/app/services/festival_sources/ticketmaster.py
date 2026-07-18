@@ -78,9 +78,32 @@ class TicketmasterSource(BaseFestivalSource):
                     )
                     img_url = sorted_images[0].get("url", "") if sorted_images else ""
 
+                # Extract city from venue
+                city_name = ""
+                if venues and isinstance(venues, list) and len(venues) > 0:
+                    city_name = str(venues[0].get("city", {}).get("name") or "")
+
+                # Extract genre/category
+                genre_name = "Music"
+                classifications = ev.get("classifications", [])
+                if isinstance(classifications, list) and len(classifications) > 0:
+                    c0 = classifications[0]
+                    if isinstance(c0, dict):
+                        genre_name = str(
+                            c0.get("genre", {}).get("name")
+                            or c0.get("subGenre", {}).get("name")
+                            or c0.get("segment", {}).get("name")
+                            or "Music"
+                        )
+                        if genre_name.lower() == "undefined":
+                            genre_name = "Music"
+
                 standardized.append({
                     "id": ev_id,
                     "name": name,
+                    "city": city_name,
+                    "genre": genre_name,
+                    "category": genre_name,
                     "lat": lat_val,
                     "lng": lng_val,
                     "coordinates": {"lat": lat_val, "lng": lng_val},
