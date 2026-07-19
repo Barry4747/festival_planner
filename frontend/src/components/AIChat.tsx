@@ -144,9 +144,16 @@ export const AIChat: React.FC<AIChatProps> = ({
       }
       
       if (response.data?.route_geometry?.length > 0 || response.data?.transport_data) {
+        let stdTransportData = response.data.transport_data || null;
+        if (stdTransportData) {
+          stdTransportData = {
+            car: stdTransportData.car || stdTransportData.car_option || null,
+            train: stdTransportData.train || (stdTransportData.train_options ? { itineraries: stdTransportData.train_options } : null),
+          };
+        }
         setRouteData({
           coordinates: response.data.route_geometry || null,
-          transportData: response.data.transport_data || null,
+          transportData: stdTransportData,
         });
       }
 

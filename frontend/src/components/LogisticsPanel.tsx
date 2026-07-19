@@ -201,16 +201,21 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
           </div>
 
           {/* Car results */}
-          {activeTransportMode === 'car' && (
+          {activeTransportMode === 'car' && transportData.car && (
             <div style={{ border: '1px solid #2D2D2D', borderRadius: '2px', padding: '0 16px' }}>
               <Row icon={<Clock size={12} />} label="Drive Time" value={transportData.car.duration} />
               <Row icon={<MapPin size={12} />} label="Distance" value={`${transportData.car.distance_km} km`} />
               <Row icon={<Fuel size={12} />} label="Est. Fuel Cost" value={transportData.car.cost} accent />
             </div>
           )}
+          {activeTransportMode === 'car' && !transportData.car && (
+            <p style={{ fontSize: '0.75rem', color: '#A1A1AA', textAlign: 'center', padding: '24px 0' }}>
+              No car route data available.
+            </p>
+          )}
 
           {/* Train results */}
-          {activeTransportMode === 'train' && (
+          {activeTransportMode === 'train' && transportData.train && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '320px', overflowY: 'auto' }} className="no-scrollbar">
               {transportData.train.itineraries.length === 0 ? (
                 <p style={{ fontSize: '0.75rem', color: '#A1A1AA', textAlign: 'center', padding: '24px 0' }}>
@@ -292,6 +297,11 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
                 })
               )}
             </div>
+          )}
+          {activeTransportMode === 'train' && !transportData.train && (
+            <p style={{ fontSize: '0.75rem', color: '#A1A1AA', textAlign: 'center', padding: '24px 0' }}>
+              No train itineraries available.
+            </p>
           )}
         </>
       )}

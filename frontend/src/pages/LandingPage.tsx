@@ -20,6 +20,8 @@ export const LandingPage: React.FC = () => {
   const descRef = useRef<HTMLParagraphElement>(null);
   const scrollPromptRef = useRef<HTMLDivElement>(null);
   const navbarRef = useRef<HTMLElement>(null);
+  const authSectionRef = useRef<HTMLElement>(null);
+  const authContentRef = useRef<HTMLDivElement>(null);
 
   const [loadedFrames, setLoadedFrames] = useState(0);
   const isFullyLoaded = loadedFrames >= 146;
@@ -96,6 +98,24 @@ export const LandingPage: React.FC = () => {
           scrub: true,
         },
       });
+
+      // Auth Section reveal
+      if (authSectionRef.current) {
+        gsap.set(authSectionRef.current, {
+          clipPath: 'inset(15% 15% 15% 15% round 24px)'
+        });
+        
+        gsap.to(authSectionRef.current, {
+          clipPath: 'inset(0% 0% 0% 0% round 0px)',
+          ease: 'power2.inOut',
+          scrollTrigger: {
+            trigger: authSectionRef.current,
+            start: 'top 90%',
+            end: 'top 30%',
+            scrub: true,
+          }
+        });
+      }
     });
 
     return () => ctx.revert();
@@ -316,22 +336,49 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* ── AUTH SECTION ── */}
-      <section id="access-section" style={{ backgroundColor: '#1E1E1E', borderTop: '1px solid #2D2D2D', padding: '120px 24px' }}>
-        <div style={{ maxWidth: '420px', margin: '0 auto' }}>
+      <section 
+        id="access-section" 
+        ref={authSectionRef}
+        style={{ 
+          position: 'relative',
+          backgroundColor: '#1E1E1E', 
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '80px 24px',
+          backgroundImage: 'url(/landing-behind-sso.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
+          overflow: 'hidden'
+        }}
+      >
+        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(18,18,18,0.7)', zIndex: 0 }}></div>
+        <div ref={authContentRef} style={{ width: '100%', maxWidth: '420px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
           <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', color: '#10B981', textTransform: 'uppercase', marginBottom: '16px', textAlign: 'center' }}>
             {t('auth.label')}
           </p>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#EDEDED', marginBottom: '40px', textAlign: 'center' }}>
             {t('auth.title')}
           </h2>
-          <AuthSection onSuccess={handleAuthSuccess} />
+          <div style={{ 
+            backgroundColor: '#1E1E1E', 
+            padding: '40px 32px', 
+            borderRadius: '4px',
+            border: '1px solid #2D2D2D',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+          }}>
+            <AuthSection onSuccess={handleAuthSuccess} />
+          </div>
         </div>
-      </section>
 
-      {/* ── FOOTER ── */}
-      <footer style={{ borderTop: '1px solid #2D2D2D', padding: '32px 24px', textAlign: 'center' }}>
-        <p style={{ fontSize: '0.75rem', color: '#A1A1AA' }}>{t('footer.copyright')}</p>
-      </footer>
+        {/* ── FOOTER ── */}
+        <footer style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '32px 24px', textAlign: 'center', zIndex: 1 }}>
+          <p style={{ fontSize: '0.75rem', color: '#A1A1AA' }}>{t('footer.copyright')}</p>
+        </footer>
+      </section>
 
       <style>{`
         @keyframes scrollIndicator {

@@ -351,7 +351,7 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
           />
 
           {/* Car Route from Logistics Panel */}
-          {transportData && activeTransportMode === 'car' && transportData.car.geometry && (
+          {transportData && activeTransportMode === 'car' && transportData.car?.geometry && (
             <Polyline positions={transportData.car.geometry} color="#3b82f6" weight={5} opacity={0.85} />
           )}
 
@@ -362,7 +362,7 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
 
             const pathCoords = activeJourney.path_coordinates && activeJourney.path_coordinates.length > 0
               ? activeJourney.path_coordinates
-              : [transportData.train.origin_coords, transportData.train.dest_coords];
+              : [transportData.train.origin_coords, transportData.train.dest_coords].filter(Boolean);
 
             const legs = activeJourney.legs || [];
 
