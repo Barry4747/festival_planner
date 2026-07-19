@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useTranslation } from 'react-i18next';
 
 interface NavbarProps {
   userEmail?: string | null;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ userEmail }) => {
+  const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const navigate = useNavigate();
@@ -42,15 +44,15 @@ export const Navbar: React.FC<NavbarProps> = ({ userEmail }) => {
             FP
           </span>
           <span className="hidden sm:block text-sm font-medium" style={{ color: '#EDEDED' }}>
-            Festival Planner
+            {t('nav.logo')}
           </span>
         </NavLink>
 
         {/* Center nav */}
         <nav className="flex items-center gap-8">
           {[
-            { to: '/discover', label: 'Discover' },
-            { to: '/my-trips', label: 'My Trips' },
+            { to: '/discover', label: t('nav.discover') },
+            { to: '/my-trips', label: t('nav.myTrips') },
           ].map(({ to, label }) => (
             <NavLink
               key={to}
@@ -86,7 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({ userEmail }) => {
                 style={{ backgroundColor: '#1E1E1E', border: '1px solid #2D2D2D' }}
               >
                 <div className="px-3 py-2.5 border-b" style={{ borderColor: '#2D2D2D' }}>
-                  <p className="text-xs" style={{ color: '#A1A1AA' }}>Signed in as</p>
+                  <p className="text-xs" style={{ color: '#A1A1AA' }}>{t('nav.signedIn')}</p>
                   <p className="text-xs font-medium truncate" style={{ color: '#EDEDED' }}>
                     {userEmail}
                   </p>
@@ -96,7 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({ userEmail }) => {
                   className="w-full px-3 py-2.5 text-left text-xs font-medium transition-colors hover:bg-[#282828]"
                   style={{ color: '#A1A1AA' }}
                 >
-                  Sign out
+                  {t('nav.signOut')}
                 </button>
               </div>
             </>

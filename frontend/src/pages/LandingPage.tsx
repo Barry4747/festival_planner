@@ -5,10 +5,12 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { supabase } from '../lib/supabase';
 import { AuthSection } from '../components/auth/AuthSection';
 import { ScrollCanvas } from '../components/ScrollCanvas';
+import { useTranslation } from 'react-i18next';
 
 gsap.registerPlugin(ScrollTrigger);
 
 export const LandingPage: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const heroSectionRef = useRef<HTMLDivElement>(null);
   const stickyRef = useRef<HTMLDivElement>(null);
@@ -114,14 +116,14 @@ export const LandingPage: React.FC = () => {
       >
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
           <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.8rem', letterSpacing: '0.15em' }}>
-            FESTIVAL PLANNER
+            {t('nav.title')}
           </span>
           <button
             onClick={scrollToAuth}
             className="text-xs font-medium px-4 py-2 transition-colors"
             style={{ color: '#10B981', border: '1px solid #10B981', borderRadius: '2px' }}
           >
-            Get Access
+            {t('nav.get_access')}
           </button>
         </div>
       </nav>
@@ -146,7 +148,7 @@ export const LandingPage: React.FC = () => {
           >
             <div className="text-center">
               <p className="text-[0.65rem] font-bold tracking-[0.2em] text-[#A1A1AA] mb-4">
-                LOADING [ {Math.round((loadedFrames / 146) * 100)}% ]
+                {t('hero.loading')} [ {Math.round((loadedFrames / 146) * 100)}% ]
               </p>
               <div className="h-[2px] bg-[#2D2D2D] w-48 mx-auto overflow-hidden rounded-full">
                 <div 
@@ -186,7 +188,7 @@ export const LandingPage: React.FC = () => {
                 marginBottom: '24px',
               }}
             >
-              Intelligent Festival Discovery
+              {t('hero.subtitle')}
             </p>
             <h1
               ref={titleRef}
@@ -199,9 +201,9 @@ export const LandingPage: React.FC = () => {
                 margin: '0 0 32px',
               }}
             >
-              Discover Your{' '}
-              <span style={{ color: '#10B981' }}>Next</span>{' '}
-              Festival
+              {t('hero.title_start')}
+              <span style={{ color: '#10B981' }}>{t('hero.title_accent')}</span>{' '}
+              {t('hero.title_end')}
             </h1>
             <p
               ref={descRef}
@@ -213,7 +215,7 @@ export const LandingPage: React.FC = () => {
                 marginBottom: '48px',
               }}
             >
-              AI-powered planning. Real-time routes. Curated European lineup.
+              {t('hero.description')}
             </p>
 
           {/* Scroll Prompt */}
@@ -230,9 +232,9 @@ export const LandingPage: React.FC = () => {
               gap: '12px',
               zIndex: 20,
             }}
-          >
-            <span style={{ fontSize: '0.65rem', letterSpacing: '0.15em', color: '#A1A1AA', textTransform: 'uppercase' }}>Scroll</span>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-bounce">
+            >
+              <span style={{ fontSize: '0.65rem', letterSpacing: '0.15em', color: '#A1A1AA', textTransform: 'uppercase' }}>{t('hero.scroll')}</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-bounce">
               <path d="M12 5v14M19 12l-7 7-7-7"/>
             </svg>
           </div>
@@ -251,7 +253,7 @@ export const LandingPage: React.FC = () => {
                 letterSpacing: '0.05em',
               }}
             >
-              Start Planning
+              {t('hero.button')}
             </button>
 
             {/* Scroll hint */}
@@ -268,7 +270,7 @@ export const LandingPage: React.FC = () => {
               }}
             >
               <p style={{ fontSize: '0.65rem', letterSpacing: '0.15em', color: '#A1A1AA', textTransform: 'uppercase' }}>
-                Scroll
+                {t('hero.scroll')}
               </p>
               <div
                 style={{
@@ -287,18 +289,18 @@ export const LandingPage: React.FC = () => {
       <section style={{ backgroundColor: '#121212', padding: '120px 24px' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
           <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', color: '#10B981', textTransform: 'uppercase', marginBottom: '24px' }}>
-            Platform
+            {t('features.label')}
           </p>
           <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 3rem)', fontWeight: 700, color: '#EDEDED', marginBottom: '80px', maxWidth: '600px' }}>
-            Every tool you need, in one place.
+            {t('features.title')}
           </h2>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1px', backgroundColor: '#2D2D2D' }}>
             {[
-              { n: '01', title: 'Interactive Map', desc: 'Live festival discovery across Europe. Click any pin to start planning.' },
-              { n: '02', title: 'AI Concierge', desc: 'Chat with an AI that knows your selected festival inside out. Ask anything.' },
-              { n: '03', title: 'Route Calculator', desc: 'Car and train routes with live cost estimates from your city.' },
-              { n: '04', title: 'My Trips', desc: 'Bookmark festivals, save plans, and resume right where you left off.' },
+              { n: '01', title: t('features.map_title'), desc: t('features.map_desc') },
+              { n: '02', title: t('features.ai_title'), desc: t('features.ai_desc') },
+              { n: '03', title: t('features.route_title'), desc: t('features.route_desc') },
+              { n: '04', title: t('features.trips_title'), desc: t('features.trips_desc') },
             ].map(({ n, title, desc }) => (
               <div
                 key={n}
@@ -317,10 +319,10 @@ export const LandingPage: React.FC = () => {
       <section id="access-section" style={{ backgroundColor: '#1E1E1E', borderTop: '1px solid #2D2D2D', padding: '120px 24px' }}>
         <div style={{ maxWidth: '420px', margin: '0 auto' }}>
           <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', color: '#10B981', textTransform: 'uppercase', marginBottom: '16px', textAlign: 'center' }}>
-            Access
+            {t('auth.label')}
           </p>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#EDEDED', marginBottom: '40px', textAlign: 'center' }}>
-            Create your account
+            {t('auth.title')}
           </h2>
           <AuthSection onSuccess={handleAuthSuccess} />
         </div>
@@ -328,7 +330,7 @@ export const LandingPage: React.FC = () => {
 
       {/* ── FOOTER ── */}
       <footer style={{ borderTop: '1px solid #2D2D2D', padding: '32px 24px', textAlign: 'center' }}>
-        <p style={{ fontSize: '0.75rem', color: '#A1A1AA' }}>© 2026 Festival Planner AI</p>
+        <p style={{ fontSize: '0.75rem', color: '#A1A1AA' }}>{t('footer.copyright')}</p>
       </footer>
 
       <style>{`

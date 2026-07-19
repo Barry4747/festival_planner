@@ -1,0 +1,40 @@
+{
+  "nav": {
+    "logo": "Festival Planner",
+    "title": "FESTIVAL PLANNER",
+    "get_access": "Get Access",
+    "discover": "Discover",
+    "myTrips": "My Trips",
+    "signedIn": "Signed in as",
+    "signOut": "Sign out"
+  },
+  "hero": {
+    "loading": "LOADING",
+    "subtitle": "Intelligent Festival Discovery",
+    "title_start": "Discover Your ",
+    "title_accent": "Next",
+    "title_end": " Festival",
+    "description": "AI-powered planning. Real-time routes. Curated European lineup.",
+    "button": "Start Planning",
+    "scroll": "Scroll"
+  },
+  "features": {
+    "label": "Platform",
+    "title": "Every tool you need, in one place.",
+    "map_title": "Interactive Map",
+    "map_desc": "Live festival discovery across Europe. Click any pin to start planning.",
+    "ai_title": "AI Concierge",
+    "ai_desc": "Chat with an AI that knows your selected festival inside out. Ask anything.",
+    "route_title": "Route Calculator",
+    "route_desc": "Car and train routes with live cost estimates from your city.",
+    "trips_title": "My Trips",
+    "trips_desc": "Bookmark festivals, save plans, and resume right where you left off."
+  },
+  "auth": {
+    "label": "Access",
+    "title": "Create your account"
+  },
+  "footer": {
+    "copyright": "© 2026 Festival Planner AI"
+  }
+}
