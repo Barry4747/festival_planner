@@ -18,6 +18,9 @@ interface PlannerState {
 
   selectedTrainIndex: number;
   setSelectedTrainIndex: (index: number) => void;
+
+  weatherForecast: any | null;
+  setWeatherForecast: (forecast: any | null) => void;
 }
 
 export const usePlannerStore = create<PlannerState>((set) => ({
@@ -32,4 +35,7 @@ export const usePlannerStore = create<PlannerState>((set) => ({
 
   selectedTrainIndex: 0,
   setSelectedTrainIndex: (index) => set({ selectedTrainIndex: index }),
+
+  weatherForecast: null,
+  setWeatherForecast: (forecast) => set({ weatherForecast: forecast }),
 }));

@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     
     # Weather API
+    OPENWEATHER_API_KEY: Optional[str] = None
     OPEN_METEO_URL: str = "https://api.open-meteo.com/v1/forecast"
     
     # Events & Lineup APIs

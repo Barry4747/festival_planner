@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../lib/axios';
 import { LocationAutocomplete } from './LocationAutocomplete';
+import { WeatherWidget } from './WeatherWidget';
 import type { FestivalItem } from './DiscoveryMap';
 import { Car, Train, Navigation, Loader2, MapPin, Clock, Fuel, ArrowRight, Check } from 'lucide-react';
 import { usePlannerStore } from '../store/usePlannerStore';
@@ -166,6 +167,8 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
           <p style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '6px' }}>{error}</p>
         )}
       </div>
+
+      <WeatherWidget />
 
       {/* Mode toggles */}
       {transportData && (

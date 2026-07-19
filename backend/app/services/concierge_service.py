@@ -149,6 +149,7 @@ class FestivalConciergeService:
             "route_geometry": route_geometry,
             "origin_city": origin_city,
             "transport_data": transport_data,
+            "weather_forecast": result.get("weather_forecast"),
         }
 
     async def generate_trip_itinerary(

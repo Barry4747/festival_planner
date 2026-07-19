@@ -196,11 +196,30 @@ async def get_travel_options(
 
     return response_json
 
+@tool
+async def fetch_weather_forecast(city: str) -> dict:
+    """Use this tool to fetch the 5-day weather forecast for a specific city. Call this when the user asks about festival weather or logistics.
+    
+    Args:
+        city: The name of the city to get the forecast for (e.g., 'Berlin', 'Warsaw').
+    """
+    print(f"\n=======================================================")
+    print(f"[TOOL CALL EXECUTING] Tool: fetch_weather_forecast | City: '{city}'")
+    logger.info(f"🛠️ [TOOL CALL EXECUTING] Tool: fetch_weather_forecast | City: '{city}'")
+    
+    from app.services.weather import fetch_weather
+    response = await fetch_weather(city)
+    
+    print(f"[TOOL RESPONSE] Weather API Response for '{city}':\n{json.dumps(response, indent=2)}")
+    print(f"=======================================================\n")
+    logger.info(f"📥 [TOOL RESPONSE] fetch_weather_forecast completed.")
+    
+    return response
 
 async def lineup_node(state: PlannerState) -> dict:
     """LangGraph node acting as an AI Concierge reading context and answering questions or discovering events."""
     llm = get_llm(temperature=0.2)
-    llm_with_tools = llm.bind_tools([search_artist_events, discover_festivals, get_travel_options])
+    llm_with_tools = llm.bind_tools([search_artist_events, discover_festivals, get_travel_options, fetch_weather_forecast])
 
     context = state.get("context") or {}
     festival_name = context.get("name") or context.get("festival_name") or "the selected music festival"
@@ -221,7 +240,8 @@ Your primary goals:
 3. Answer any user questions about travel logistics, estimated costs/budget ({budget} PLN), accommodations, festival rules, and lineup advice using the travel data retrieved.
 4. Event Discovery: When the user asks for festivals or events in a specific timeframe (date range) or geographic area (city, country, or 'Europe'), intelligently invoke the `discover_festivals` tool with appropriate parameters (`location_type`, `location_value`, `date_from`, `date_to`, `genres`).
 5. Artist Checking: Use `search_artist_events` ONLY with specific artist/band names (e.g., 'Arctic Monkeys', 'Dua Lipa') to check their upcoming tour dates. NEVER pass a festival name as an artist name to `search_artist_events`.
-6. Coordinates & Mapping: When `discover_festivals` or `search_artist_events` returns events with venue geographic coordinates (`latitude` and `longitude`), clearly summarize these coordinates or note that raw festival coordinates have been saved for frontend mapping and location visualization.
+6. Weather Forecast: Use `fetch_weather_forecast` when the user asks about the weather for the festival city.
+7. Coordinates & Mapping: When `discover_festivals` or `search_artist_events` returns events with venue geographic coordinates (`latitude` and `longitude`), clearly summarize these coordinates or note that raw festival coordinates have been saved for frontend mapping and location visualization.
 
 User context/preferences:
 - Favorite genres: {genres_str}
@@ -248,11 +268,21 @@ Always provide a detailed, highly engaging, structured markdown response."""
     llm_response = await llm_with_tools.ainvoke(messages)
 
     if hasattr(llm_response, "tool_calls") and llm_response.tool_calls:
-        print(f"\n🤖 [GEMINI TOOL REQUEST] Model requested tool calls: {json.dumps(llm_response.tool_calls, indent=2, ensure_ascii=False)}")
-        logger.info(f"🤖 [GEMINI TOOL REQUEST] Model requested tool calls: {llm_response.tool_calls}")
-    else:
-        print(f"\n✨ [GEMINI FINAL RESPONSE] Model generated final summary ({len(str(llm_response.content))} chars).")
-        logger.info(f"✨ [GEMINI FINAL RESPONSE] Model generated final summary.")
+        logger.info(f"🤖 [NODE: lineup_agent] AI decided to call tools: {llm_response.tool_calls}")
+
+    # Extract weather forecast from tool messages if present in the state history
+    weather_forecast = state.get("weather_forecast")
+    if user_messages:
+        for msg in reversed(user_messages):
+            if getattr(msg, "type", "") == "tool" and getattr(msg, "name", "") == "fetch_weather_forecast":
+                try:
+                    weather_data = json.loads(msg.content)
+                    weather_forecast = weather_data
+                except Exception:
+                    pass
+                break
+
+    return {"messages": [llm_response], "weather_forecast": weather_forecast}
 
     # Extract discovered festivals with coordinates across messages
     discovered_festivals = list(state.get("discovered_festivals", [])) if isinstance(state, dict) else []

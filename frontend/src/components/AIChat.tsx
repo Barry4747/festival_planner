@@ -53,6 +53,7 @@ export const AIChat: React.FC<AIChatProps> = ({
 }) => {
   const setDepartureCity = usePlannerStore((state) => state.setDepartureCity);
   const setRouteData = usePlannerStore((state) => state.setRouteData);
+  const setWeatherForecast = usePlannerStore((state) => state.setWeatherForecast);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome-init',
@@ -155,6 +156,10 @@ export const AIChat: React.FC<AIChatProps> = ({
           coordinates: response.data.route_geometry || null,
           transportData: stdTransportData,
         });
+      }
+
+      if (response.data?.weather_forecast) {
+        setWeatherForecast(response.data.weather_forecast);
       }
 
       const replyText = formatMessageContent(
