@@ -89,9 +89,22 @@ class FestivalConciergeService:
             ai_msg = messages[-1]
 
         route_geometry = None
+        origin_city = None
+        transport_data = None
+
         for m in reversed(messages):
             m_type = getattr(m, "type", "") or type(m).__name__
             m_name = getattr(m, "name", "")
+            
+            # Extract origin_city from AIMessage tool calls
+            if m_type in ("ai", "AIMessage") and hasattr(m, "tool_calls"):
+                for tc in m.tool_calls:
+                    if tc.get("name") == "get_travel_options":
+                        args = tc.get("args", {})
+                        if "origin_city" in args:
+                            origin_city = args["origin_city"]
+            
+            # Extract transport_data and route_geometry from ToolMessage
             if m_type in ("tool", "ToolMessage") or m_name == "get_travel_options":
                 m_content = getattr(m, "content", "")
                 if isinstance(m_content, str) and "car_option" in m_content and "geometry" in m_content:
@@ -99,10 +112,10 @@ class FestivalConciergeService:
                         import json
                         tool_data = json.loads(m_content)
                         if isinstance(tool_data, dict) and "car_option" in tool_data:
+                            transport_data = tool_data
                             geom = tool_data["car_option"].get("geometry")
                             if isinstance(geom, list) and len(geom) > 0:
                                 route_geometry = geom
-                                break
                     except Exception as e:
                         logger.debug(f"Could not parse tool message for route_geometry: {e}")
 
@@ -134,6 +147,8 @@ class FestivalConciergeService:
             "context": ctx,
             "thread_id": thread_id,
             "route_geometry": route_geometry,
+            "origin_city": origin_city,
+            "transport_data": transport_data,
         }
 
     async def generate_trip_itinerary(

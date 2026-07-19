@@ -70,7 +70,9 @@ async def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         # Bezpiecznie zwracamy dane użytkownika w formie słownika/modelu
-        return user_response.user.model_dump() if hasattr(user_response.user, "model_dump") else dict(user_response.user)
+        user_dict = user_response.user.model_dump() if hasattr(user_response.user, "model_dump") else dict(user_response.user)
+        user_dict["access_token"] = token
+        return user_dict
     except HTTPException:
         raise
     except Exception as e:

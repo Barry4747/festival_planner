@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { LogOut, Sparkles, ChevronDown, User } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
 interface NavbarProps {
@@ -7,65 +7,96 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ userEmail }) => {
+  const [scrolled, setScrolled] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handler = () => setScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', handler, { passive: true });
+    return () => window.removeEventListener('scroll', handler);
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    navigate('/');
   };
 
-  const initials = userEmail
-    ? userEmail.substring(0, 2).toUpperCase()
-    : 'AI';
+  const initials = userEmail ? userEmail.slice(0, 2).toUpperCase() : '??';
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#090b0a]/90 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+    <header
+      className="fixed top-0 left-0 right-0 z-50 transition-colors duration-200"
+      style={{
+        backgroundColor: scrolled ? '#1E1E1E' : 'transparent',
+        borderBottom: scrolled ? '1px solid #2D2D2D' : '1px solid transparent',
+      }}
+    >
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
         {/* Logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
-            <Sparkles className="h-4 w-4" />
-          </div>
-          <span className="text-sm font-semibold tracking-tight text-white">
-            Festival Planner AI
-          </span>
-          <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
-            Pro
-          </span>
-        </div>
-
-        {/* Right side */}
-        <div className="relative flex items-center gap-3">
-          {/* User button */}
-          <button
-            onClick={() => setShowMenu((v) => !v)}
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#111412] px-3 py-1.5 text-xs font-medium transition-colors hover:border-white/20"
+        <NavLink to="/discover" className="flex items-center gap-2">
+          <span
+            className="text-sm font-semibold tracking-widest uppercase"
+            style={{ color: '#10B981', letterSpacing: '0.15em' }}
           >
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-emerald-600/20 text-emerald-400 font-bold text-[11px]">
-              {initials}
-            </div>
-            <span className="max-w-[150px] truncate text-slate-300">
-              {userEmail || 'Account'}
-            </span>
-            <ChevronDown className={`h-3.5 w-3.5 text-slate-500 transition-transform ${showMenu ? 'rotate-180' : ''}`} />
+            FP
+          </span>
+          <span className="hidden sm:block text-sm font-medium" style={{ color: '#EDEDED' }}>
+            Festival Planner
+          </span>
+        </NavLink>
+
+        {/* Center nav */}
+        <nav className="flex items-center gap-8">
+          {[
+            { to: '/discover', label: 'Discover' },
+            { to: '/my-trips', label: 'My Trips' },
+          ].map(({ to, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `text-sm font-medium transition-colors duration-150 pb-0.5 ${
+                  isActive
+                    ? 'border-b border-[#10B981] text-[#10B981]'
+                    : 'text-[#A1A1AA] hover:text-[#EDEDED]'
+                }`
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Right: user avatar */}
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu(v => !v)}
+            className="flex items-center justify-center w-8 h-8 rounded-sm text-xs font-bold transition-colors"
+            style={{ backgroundColor: '#2D2D2D', color: '#10B981', border: '1px solid #2D2D2D' }}
+          >
+            {initials}
           </button>
 
-          {/* Dropdown */}
           {showMenu && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-full z-20 mt-1.5 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#111412] shadow-lg">
-                <div className="border-b border-white/10 px-3.5 py-2.5">
-                  <div className="flex items-center gap-2 text-xs font-medium text-white">
-                    <User className="h-3.5 w-3.5 text-slate-400" />
-                    <span className="truncate">{userEmail}</span>
-                  </div>
+              <div
+                className="absolute right-0 top-full z-20 mt-2 w-48 overflow-hidden rounded-sm"
+                style={{ backgroundColor: '#1E1E1E', border: '1px solid #2D2D2D' }}
+              >
+                <div className="px-3 py-2.5 border-b" style={{ borderColor: '#2D2D2D' }}>
+                  <p className="text-xs" style={{ color: '#A1A1AA' }}>Signed in as</p>
+                  <p className="text-xs font-medium truncate" style={{ color: '#EDEDED' }}>
+                    {userEmail}
+                  </p>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-2 px-3.5 py-2.5 text-xs text-slate-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
+                  className="w-full px-3 py-2.5 text-left text-xs font-medium transition-colors hover:bg-[#282828]"
+                  style={{ color: '#A1A1AA' }}
                 >
-                  <LogOut className="h-3.5 w-3.5" />
-                  <span>Sign Out</span>
+                  Sign out
                 </button>
               </div>
             </>

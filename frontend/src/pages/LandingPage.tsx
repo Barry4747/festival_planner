@@ -1,138 +1,342 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Compass, ArrowUpRight } from 'lucide-react';
-import { Hero } from '../components/landing/Hero';
-import { Features } from '../components/landing/Features';
-import { FestivalShowcase } from '../components/landing/FestivalShowcase';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { supabase } from '../lib/supabase';
 import { AuthSection } from '../components/auth/AuthSection';
-import { Button } from '../components/ui/Button';
+import { ScrollCanvas } from '../components/ScrollCanvas';
+
+gsap.registerPlugin(ScrollTrigger);
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const authRef = useRef<HTMLDivElement>(null);
+  const heroSectionRef = useRef<HTMLDivElement>(null);
+  const stickyRef = useRef<HTMLDivElement>(null);
+  const overlayTitleRef = useRef<HTMLDivElement>(null);
+  const subtitleRef = useRef<HTMLParagraphElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const descRef = useRef<HTMLParagraphElement>(null);
+  const scrollPromptRef = useRef<HTMLDivElement>(null);
+  const navbarRef = useRef<HTMLElement>(null);
 
-  const scrollToAuth = (_mode?: 'signin' | 'signup') => {
-    authRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
+  const [loadedFrames, setLoadedFrames] = useState(0);
+  const isFullyLoaded = loadedFrames >= 146;
 
-  const handleAuthSuccess = () => {
-    navigate('/dashboard');
+  // Scroll lock
+  useEffect(() => {
+    if (!isFullyLoaded) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isFullyLoaded]);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) navigate('/discover');
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) navigate('/discover');
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  // Navbar transparency on scroll
+  useEffect(() => {
+    const el = navbarRef.current;
+    if (!el) return;
+    const handler = () => {
+      el.style.backgroundColor = window.scrollY > 20 ? '#1E1E1E' : 'transparent';
+      el.style.borderBottomColor = window.scrollY > 20 ? '#2D2D2D' : 'transparent';
+    };
+    window.addEventListener('scroll', handler, { passive: true });
+    return () => window.removeEventListener('scroll', handler);
+  }, []);
+
+  // GSAP hero overlay text fade out
+  useEffect(() => {
+    const section = heroSectionRef.current;
+    const overlay = overlayTitleRef.current;
+    if (!section || !overlay) return;
+
+    const ctx = gsap.context(() => {
+      // Initial state
+      if (!isFullyLoaded) {
+        gsap.set([subtitleRef.current, titleRef.current, descRef.current, scrollPromptRef.current], {
+          opacity: 0,
+          y: 32
+        });
+      }
+
+      // Fade in sequentially when fully loaded
+      if (isFullyLoaded) {
+        gsap.to([subtitleRef.current, titleRef.current, descRef.current, scrollPromptRef.current], {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          stagger: 0.2,
+          ease: 'power3.out',
+          delay: 0.4
+        });
+      }
+
+      // Fade out overlay text as user scrolls
+      gsap.to(overlay, {
+        opacity: 0,
+        y: -30,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: section,
+          start: 'top top',
+          end: '25% top',
+          scrub: true,
+        },
+      });
+    });
+
+    return () => ctx.revert();
+  }, [isFullyLoaded]);
+
+  const handleAuthSuccess = () => navigate('/discover');
+  const scrollToAuth = () => {
+    document.getElementById('access-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   return (
-    <div className="min-h-dvh bg-[#090b0a] text-white flex flex-col font-sans selection:bg-emerald-500 selection:text-black">
-      {/* ── MINIMALIST HUMANISTIC TOP BAR ── */}
-      <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#090b0a]/90 backdrop-blur-xl transition-all">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Brand Mark */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500 text-black shadow-md shadow-emerald-500/20">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <div>
-              <span className="block text-sm font-medium tracking-tight text-white">
-                Festival Planner AI
-              </span>
-              <span className="block text-[10px] font-mono uppercase tracking-widest text-emerald-400">
-                Solomei Suite
-              </span>
-            </div>
-          </div>
-
-          {/* Elegant Page-Free Anchor Links */}
-          <div className="hidden items-center gap-8 sm:flex text-xs font-light tracking-wide text-slate-300">
-            <a href="#chronicles" className="transition-colors hover:text-emerald-400">
-              Chronicles
-            </a>
-            <a href="#architecture" className="transition-colors hover:text-emerald-400">
-              Architecture
-            </a>
-            <a href="#suite" className="transition-colors hover:text-emerald-400">
-              Suite Access
-            </a>
-          </div>
-
-          {/* CTA */}
-          <Button
-            onClick={() => scrollToAuth('signup')}
-            variant="primary"
-            size="sm"
-            className="rounded-xl px-4 py-2 text-xs font-semibold shadow-lg shadow-emerald-500/20"
+    <div style={{ backgroundColor: '#121212', color: '#EDEDED', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      {/* ── NAVBAR ── */}
+      <nav
+        ref={navbarRef}
+        className="fixed top-0 left-0 right-0 z-50 transition-colors duration-200"
+        style={{ backgroundColor: 'transparent', borderBottom: '1px solid transparent' }}
+      >
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
+          <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.8rem', letterSpacing: '0.15em' }}>
+            FESTIVAL PLANNER
+          </span>
+          <button
+            onClick={scrollToAuth}
+            className="text-xs font-medium px-4 py-2 transition-colors"
+            style={{ color: '#10B981', border: '1px solid #10B981', borderRadius: '2px' }}
           >
-            <span>Launch Studio</span>
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </Button>
+            Get Access
+          </button>
         </div>
       </nav>
 
-      {/* ── HERO INTERACTIVE INTENT ENGINE ── */}
-      <Hero
-        onGetStarted={() => scrollToAuth('signup')}
-        onSignIn={() => scrollToAuth('signin')}
-      />
+      {/* ── SCROLL-BOUND VIDEO HERO (200vh tall) ── */}
+      <section ref={heroSectionRef} style={{ height: '200vh', position: 'relative' }}>
+        {/* Sticky viewport frame */}
+        <div
+          ref={stickyRef}
+          style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}
+        >
+          {/* Canvas Image Sequence Layer */}
+          <ScrollCanvas 
+            frameCount={146} 
+            urlTemplate="/frames_fast/frame_{index}.webp" 
+            onProgress={(loaded) => setLoadedFrames(loaded)}
+          />
 
-      {/* ── EDITORIAL CHRONICLES ── */}
-      <div id="chronicles">
-        <FestivalShowcase />
-      </div>
-
-      {/* ── HUMANISTIC ARCHITECTURE ── */}
-      <div id="architecture">
-        <Features />
-      </div>
-
-      {/* ── AUTHENTICATION SUITE ── */}
-      <section id="suite" ref={authRef} className="py-28 px-4 sm:px-6 lg:px-8 border-b border-white/10 relative overflow-hidden">
-        {/* Ambient background glow */}
-        <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[350px] rounded-full bg-emerald-600/10 blur-[130px] -z-10" />
-
-        <div className="mx-auto max-w-md">
-          {/* Header */}
-          <div className="mb-10 text-center">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-mono text-emerald-400 mb-3">
-              <Compass className="h-3 w-3" />
-              <span>ENTER THE CONCIERGE SUITE</span>
+          {/* Loading Overlay */}
+          <div 
+            className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#121212] transition-opacity duration-1000 ${isFullyLoaded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+          >
+            <div className="text-center">
+              <p className="text-[0.65rem] font-bold tracking-[0.2em] text-[#A1A1AA] mb-4">
+                LOADING [ {Math.round((loadedFrames / 146) * 100)}% ]
+              </p>
+              <div className="h-[2px] bg-[#2D2D2D] w-48 mx-auto overflow-hidden rounded-full">
+                <div 
+                  className="h-full bg-[#10B981] transition-all duration-300 ease-out" 
+                  style={{ width: `${(loadedFrames / 146) * 100}%` }}
+                />
+              </div>
             </div>
-            <h2 className="text-3xl sm:text-4xl font-light tracking-tight text-white leading-tight">
-              Begin your bespoke <br />
-              <span className="font-serif italic text-emerald-400">festival journey</span>.
-            </h2>
-            <p className="mt-2.5 text-xs font-light text-slate-300 leading-relaxed">
-              Create your secure profile or sign in with Google to unlock full split-screen cartography, 
-              live Ticketmaster coordinates, and instant LangGraph itinerary synthesis.
+          </div>
+
+          {/* Solid dark overlay for text readability */}
+          <div className="absolute inset-0 z-10 pointer-events-none" style={{ backgroundColor: 'rgba(18,18,18,0.6)' }}></div>
+
+          {/* Overlay text */}
+          <div
+            ref={overlayTitleRef}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '0 24px',
+            }}
+          >
+            <p
+              ref={subtitleRef}
+              style={{
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                letterSpacing: '0.25em',
+                color: '#10B981',
+                textTransform: 'uppercase',
+                marginBottom: '24px',
+              }}
+            >
+              Intelligent Festival Discovery
             </p>
-          </div>
+            <h1
+              ref={titleRef}
+              style={{
+                fontSize: 'clamp(2.5rem, 6vw, 5rem)',
+                fontWeight: 700,
+                lineHeight: 1.05,
+                color: '#EDEDED',
+                maxWidth: '820px',
+                margin: '0 0 32px',
+              }}
+            >
+              Discover Your{' '}
+              <span style={{ color: '#10B981' }}>Next</span>{' '}
+              Festival
+            </h1>
+            <p
+              ref={descRef}
+              style={{
+                fontSize: '1rem',
+                color: '#A1A1AA',
+                maxWidth: '480px',
+                lineHeight: 1.65,
+                marginBottom: '48px',
+              }}
+            >
+              AI-powered planning. Real-time routes. Curated European lineup.
+            </p>
 
-          {/* Auth Card */}
-          <div className="rounded-3xl border border-white/10 bg-[#111412] p-7 sm:p-9 shadow-2xl backdrop-blur-xl">
-            <AuthSection onSuccess={handleAuthSuccess} />
+          {/* Scroll Prompt */}
+          <div
+            ref={scrollPromptRef}
+            style={{
+              position: 'absolute',
+              bottom: '40px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '12px',
+              zIndex: 20,
+            }}
+          >
+            <span style={{ fontSize: '0.65rem', letterSpacing: '0.15em', color: '#A1A1AA', textTransform: 'uppercase' }}>Scroll</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-bounce">
+              <path d="M12 5v14M19 12l-7 7-7-7"/>
+            </svg>
           </div>
+            <button
+              onClick={scrollToAuth}
+              className="transition-colors"
+              style={{
+                backgroundColor: '#10B981',
+                color: '#121212',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                padding: '12px 32px',
+                borderRadius: '2px',
+                border: 'none',
+                cursor: 'pointer',
+                letterSpacing: '0.05em',
+              }}
+            >
+              Start Planning
+            </button>
 
-          <p className="mt-5 text-center text-[11px] font-light text-slate-500">
-            Strictly Private · Powered by Supabase Authentication · Zero Data Selling
-          </p>
+            {/* Scroll hint */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '40px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <p style={{ fontSize: '0.65rem', letterSpacing: '0.15em', color: '#A1A1AA', textTransform: 'uppercase' }}>
+                Scroll
+              </p>
+              <div
+                style={{
+                  width: '1px',
+                  height: '40px',
+                  backgroundColor: '#2D2D2D',
+                  animation: 'scrollIndicator 1.5s ease-in-out infinite',
+                }}
+              />
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ── BOUTIQUE EDITORIAL FOOTER ── */}
-      <footer className="py-12 px-4 sm:px-6 lg:px-8 mt-auto bg-[#0a0d0b]">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 sm:flex-row text-xs text-slate-500">
-          <div className="flex items-center gap-3">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400 font-bold font-mono">
-              AI
-            </div>
-            <div>
-              <span className="block font-medium text-slate-300">Festival Planner AI · Solomei Experience</span>
-              <span className="block text-[10px] text-slate-500 font-light">Humanistic Artificial Intelligence Architecture</span>
-            </div>
-          </div>
-          <p className="text-center sm:text-right font-light text-[11px] text-slate-400 leading-relaxed">
-            Orchestrated with LangGraph · Google Gemini AI · Ticketmaster Segment `KZFzniwnSyZfZ7v7nJ` · Supabase
+      {/* ── FEATURES SECTION ── */}
+      <section style={{ backgroundColor: '#121212', padding: '120px 24px' }}>
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', color: '#10B981', textTransform: 'uppercase', marginBottom: '24px' }}>
+            Platform
           </p>
+          <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 3rem)', fontWeight: 700, color: '#EDEDED', marginBottom: '80px', maxWidth: '600px' }}>
+            Every tool you need, in one place.
+          </h2>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1px', backgroundColor: '#2D2D2D' }}>
+            {[
+              { n: '01', title: 'Interactive Map', desc: 'Live festival discovery across Europe. Click any pin to start planning.' },
+              { n: '02', title: 'AI Concierge', desc: 'Chat with an AI that knows your selected festival inside out. Ask anything.' },
+              { n: '03', title: 'Route Calculator', desc: 'Car and train routes with live cost estimates from your city.' },
+              { n: '04', title: 'My Trips', desc: 'Bookmark festivals, save plans, and resume right where you left off.' },
+            ].map(({ n, title, desc }) => (
+              <div
+                key={n}
+                style={{ backgroundColor: '#121212', padding: '40px 32px' }}
+              >
+                <p style={{ fontSize: '0.65rem', color: '#2D2D2D', fontWeight: 700, letterSpacing: '0.1em', marginBottom: '16px' }}>{n}</p>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: '#EDEDED', marginBottom: '12px' }}>{title}</h3>
+                <p style={{ fontSize: '0.875rem', color: '#A1A1AA', lineHeight: 1.65 }}>{desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
+      </section>
+
+      {/* ── AUTH SECTION ── */}
+      <section id="access-section" style={{ backgroundColor: '#1E1E1E', borderTop: '1px solid #2D2D2D', padding: '120px 24px' }}>
+        <div style={{ maxWidth: '420px', margin: '0 auto' }}>
+          <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', color: '#10B981', textTransform: 'uppercase', marginBottom: '16px', textAlign: 'center' }}>
+            Access
+          </p>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#EDEDED', marginBottom: '40px', textAlign: 'center' }}>
+            Create your account
+          </h2>
+          <AuthSection onSuccess={handleAuthSuccess} />
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer style={{ borderTop: '1px solid #2D2D2D', padding: '32px 24px', textAlign: 'center' }}>
+        <p style={{ fontSize: '0.75rem', color: '#A1A1AA' }}>© 2026 Festival Planner AI</p>
       </footer>
+
+      <style>{`
+        @keyframes scrollIndicator {
+          0%, 100% { opacity: 0.2; transform: scaleY(1); }
+          50% { opacity: 1; transform: scaleY(0.6); }
+        }
+      `}</style>
     </div>
   );
 };
-
-export default LandingPage;

@@ -34,9 +34,9 @@ export const AuthSection: React.FC<AuthSectionProps> = ({
     import.meta.env.VITE_AUTH_REDIRECT_URL ||
     import.meta.env.VITE_APP_URL ||
     window.location.origin;
-  const redirectTo = baseRedirect.endsWith('/dashboard') || baseRedirect.endsWith('/dashboard/')
+  const redirectTo = baseRedirect.endsWith('/discover') || baseRedirect.endsWith('/discover/')
     ? baseRedirect
-    : `${baseRedirect.replace(/\/+$/, '')}/dashboard`;
+    : `${baseRedirect.replace(/\/+$/, '')}/discover`;
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();

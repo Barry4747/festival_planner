@@ -11,7 +11,8 @@ import {
   Sparkles,
   Info,
   RefreshCw,
-  Navigation,
+  Bookmark,
+  BookmarkCheck,
 } from 'lucide-react';
 
 // Ensure default icon compatibility with Vite
@@ -42,6 +43,18 @@ const createFestivalIcon = (isSelected: boolean) => {
     popupAnchor: [0, -18],
   });
 };
+
+const OriginPinIcon = L.divIcon({
+  className: 'origin-pin-marker',
+  html: `<div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;position:relative">
+    <div style="position:absolute;width:30px;height:30px;border-radius:50%;background:rgba(59,130,246,0.15);animation:pulse 1.8s ease-in-out infinite"></div>
+    <div style="position:relative;width:20px;height:20px;border-radius:50%;background:#3b82f6;border:2px solid #fff;display:flex;align-items:center;justify-content:center">
+      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L12 22M2 12L22 12"/></svg>
+    </div>
+  </div>`,
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+});
 
 const CenterPinIcon = L.divIcon({
   className: 'center-pin-marker',
@@ -129,6 +142,9 @@ interface DiscoveryMapProps {
   transportData?: TransportRoutesData | null;
   activeTransportMode?: 'car' | 'train';
   selectedTrainIndex?: number;
+  savedTrips?: FestivalItem[];
+  onToggleSavedTrip?: (festival: FestivalItem) => Promise<void> | void;
+  originCoords?: [number, number] | null;
 }
 
 const RADIUS_PRESETS = [50, 100, 250, 500];
@@ -143,8 +159,12 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
   transportData,
   activeTransportMode,
   selectedTrainIndex = 0,
+  savedTrips = [],
+  onToggleSavedTrip,
+  originCoords,
 }) => {
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState<boolean>(false);
+  const [savingTripId, setSavingTripId] = useState<string | null>(null);
   // Default pin: Warsaw / Central Poland
   const [pin, setPin] = useState<{ lat: number; lng: number }>({ lat: 52.2297, lng: 21.0122 });
   const [radiusKm, setRadiusKm] = useState<number>(100);
@@ -155,6 +175,17 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const debounceTimer = useRef<any>(null);
+
+  const handleToggle = async (e: React.MouseEvent, festival: FestivalItem) => {
+    e.stopPropagation();
+    if (!onToggleSavedTrip) return;
+    setSavingTripId(String(festival.id));
+    try {
+      await onToggleSavedTrip(festival);
+    } finally {
+      setSavingTripId(null);
+    }
+  };
 
   const fetchFestivals = async (lat: number, lng: number, radius: number, start: string, end: string) => {
     setLoading(true);
@@ -200,91 +231,76 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#111412] shadow-xl">
-      {/* ── TOP CONTROL PANEL ── */}
-      <div className="border-b border-white/10 bg-[#0d0f0e] p-4 space-y-3.5">
-        {/* Header & Pin coordinates status */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
-              <MapPin className="h-4 w-4" />
-            </div>
-            <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-white">
-                Interactive Discovery Map
-              </h2>
-              <p className="text-[11px] text-slate-400">
-                Click anywhere on map to move search center pin
-              </p>
-            </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', backgroundColor: '#1E1E1E' }}>
+      {/* ── CONTROL PANEL ── */}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #2D2D2D', backgroundColor: '#1E1E1E', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {/* Header row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MapPin size={13} style={{ color: '#10B981' }} />
+            <span style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#EDEDED' }}>
+              Discovery Map
+            </span>
+            <span style={{ fontSize: '0.65rem', color: '#A1A1AA', fontFamily: 'monospace' }}>
+              {pin.lat.toFixed(3)}, {pin.lng.toFixed(3)}
+            </span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <div className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/40 px-2.5 py-1 text-[11px] font-mono text-slate-300">
-              <Navigation className="h-3 w-3 text-emerald-400" />
-              <span>{pin.lat.toFixed(3)}, {pin.lng.toFixed(3)}</span>
-            </div>
-            {loading && (
-              <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span className="text-[11px] hidden sm:inline">Scanning API...</span>
-              </div>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {loading && <Loader2 size={12} style={{ color: '#10B981', animation: 'spin 0.8s linear infinite' }} />}
           </div>
         </div>
 
-        {/* Controls Grid: Date pickers & Radius slider */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 items-center">
+        {/* Controls row: dates + radius */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           {/* Start Date */}
-          <div className="sm:col-span-3">
-            <label className="mb-1 block text-[10px] font-medium text-slate-400">
-              START DATE
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-emerald-500 pointer-events-none" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#A1A1AA' }}>From</label>
+            <div style={{ position: 'relative' }}>
+              <Calendar size={11} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#10B981', pointerEvents: 'none' }} />
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#151917] pl-8 pr-2 py-1.5 text-xs text-white focus:border-emerald-500 focus:outline-none transition-all"
+                onChange={e => setStartDate(e.target.value)}
+                style={inputStyle}
               />
             </div>
           </div>
-
           {/* End Date */}
-          <div className="sm:col-span-3">
-            <label className="mb-1 block text-[10px] font-medium text-slate-400">
-              END DATE
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-emerald-500 pointer-events-none" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#A1A1AA' }}>To</label>
+            <div style={{ position: 'relative' }}>
+              <Calendar size={11} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#10B981', pointerEvents: 'none' }} />
               <input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#151917] pl-8 pr-2 py-1.5 text-xs text-white focus:border-emerald-500 focus:outline-none transition-all"
+                onChange={e => setEndDate(e.target.value)}
+                style={inputStyle}
               />
             </div>
           </div>
-
-          {/* Radius Slider & Quick Presets */}
-          <div className="sm:col-span-6 space-y-1">
-            <div className="flex items-center justify-between text-[10px] font-medium text-slate-400">
-              <span className="flex items-center gap-1">
-                <Sliders className="h-3 w-3 text-emerald-400" />
-                <span>SEARCH RADIUS: <strong className="text-white">{radiusKm} KM</strong></span>
-              </span>
-              <div className="flex gap-1">
-                {RADIUS_PRESETS.map((val) => (
+          {/* Radius */}
+          <div style={{ flex: 1, minWidth: '140px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#A1A1AA', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Sliders size={10} /> Radius: <strong style={{ color: '#EDEDED' }}>{radiusKm} km</strong>
+              </label>
+              <div style={{ display: 'flex', gap: '3px' }}>
+                {RADIUS_PRESETS.map(val => (
                   <button
                     key={val}
-                    type="button"
                     onClick={() => setRadiusKm(val)}
-                    className={`rounded px-1.5 py-0.5 text-[9px] font-semibold transition-all ${
-                      radiusKm === val
-                        ? 'bg-emerald-500 text-black'
-                        : 'bg-white/5 text-slate-400 hover:text-white'
-                    }`}
+                    style={{
+                      padding: '2px 6px',
+                      fontSize: '0.6rem',
+                      fontWeight: 600,
+                      border: '1px solid',
+                      borderColor: radiusKm === val ? '#10B981' : '#2D2D2D',
+                      backgroundColor: radiusKm === val ? '#10B981' : 'transparent',
+                      color: radiusKm === val ? '#121212' : '#A1A1AA',
+                      borderRadius: '2px',
+                      cursor: 'pointer',
+                      transition: 'all 0.1s',
+                    }}
                   >
                     {val}km
                   </button>
@@ -293,29 +309,20 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
             </div>
             <input
               type="range"
-              min={10}
-              max={500}
-              step={10}
+              min={10} max={500} step={10}
               value={radiusKm}
-              onChange={(e) => setRadiusKm(Number(e.target.value))}
-              className="w-full accent-emerald-500 h-1.5 bg-white/10 rounded-lg cursor-pointer"
+              onChange={e => setRadiusKm(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#10B981', cursor: 'pointer', height: '2px' }}
             />
           </div>
         </div>
       </div>
-
       {/* ── MAP CONTAINER ── */}
-      <div className="relative flex-1 min-h-[420px] w-full">
-        {/* Error overlay if any */}
+      <div style={{ position: 'relative', flex: 1, minHeight: 0, width: '100%' }}>
         {error && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] rounded-xl border border-red-500/30 bg-red-950/90 px-4 py-2 text-xs text-red-200 shadow-xl flex items-center gap-2">
+          <div style={{ position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, display: 'flex', gap: '8px', alignItems: 'center', backgroundColor: 'rgba(127,29,29,0.95)', border: '1px solid rgba(239,68,68,0.4)', padding: '6px 12px', borderRadius: '2px', fontSize: '0.75rem', color: '#fca5a5' }}>
             <span>{error}</span>
-            <button
-              onClick={() => fetchFestivals(pin.lat, pin.lng, radiusKm, startDate, endDate)}
-              className="underline font-semibold hover:text-white"
-            >
-              Retry
-            </button>
+            <button onClick={() => fetchFestivals(pin.lat, pin.lng, radiusKm, startDate, endDate)} style={{ fontWeight: 600, textDecoration: 'underline', color: '#fff', background: 'none', border: 'none', cursor: 'pointer' }}>Retry</button>
           </div>
         )}
 
@@ -361,13 +368,7 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
 
             return (
               <React.Fragment key={`train-route-${selectedTrainIndex}`}>
-                <Polyline
-                  positions={pathCoords}
-                  color="#ef4444"
-                  weight={5}
-                  dashArray="6, 10"
-                  opacity={0.85}
-                />
+                <Polyline positions={pathCoords} color="#ef4444" weight={4} dashArray="6, 10" opacity={0.85} />
 
                 {legs.map((leg, legIdx) => {
                   const isFirst = legIdx === 0;
@@ -375,39 +376,27 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
 
                   return (
                     <React.Fragment key={`leg-${legIdx}`}>
-                      {/* Origin / Transfer Station Marker for this Leg */}
                       <CircleMarker
                         center={[leg.origin.lat, leg.origin.lng]}
                         radius={isFirst ? 8 : 7}
-                        pathOptions={{
-                          color: '#ffffff',
-                          fillColor: isFirst ? '#3b82f6' : '#f59e0b',
-                          fillOpacity: 1,
-                          weight: 2,
-                        }}
+                        pathOptions={{ color: '#ffffff', fillColor: isFirst ? '#3b82f6' : '#f59e0b', fillOpacity: 1, weight: 2 }}
                       >
                         <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
-                          <span className="font-sans text-xs font-bold text-slate-900">
-                            {isFirst ? '🚆 Start: ' : '🔄 Transfer: '} {leg.origin.name} ({leg.departure})
+                          <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', fontWeight: 600, color: '#121212' }}>
+                            {isFirst ? 'Departure: ' : 'Transfer: '} {leg.origin.name} ({leg.departure})
                           </span>
                         </Tooltip>
                       </CircleMarker>
 
-                      {/* Destination Station Marker (rendered explicitly for final leg) */}
                       {isLast && (
                         <CircleMarker
                           center={[leg.destination.lat, leg.destination.lng]}
                           radius={8}
-                          pathOptions={{
-                            color: '#ffffff',
-                            fillColor: '#10b981',
-                            fillOpacity: 1,
-                            weight: 2,
-                          }}
+                          pathOptions={{ color: '#ffffff', fillColor: '#10b981', fillOpacity: 1, weight: 2 }}
                         >
                           <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
-                            <span className="font-sans text-xs font-bold text-slate-900">
-                              🏁 Arrival: {leg.destination.name} ({leg.arrival})
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', fontWeight: 600, color: '#121212' }}>
+                              Arrival: {leg.destination.name} ({leg.arrival})
                             </span>
                           </Tooltip>
                         </CircleMarker>
@@ -439,20 +428,30 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
 
           {/* Search Center Pin */}
           <Marker position={[pin.lat, pin.lng]} icon={CenterPinIcon}>
-            <Popup className="custom-leaflet-popup">
-              <div className="p-1 text-center font-sans">
-                <div className="text-xs font-bold text-slate-900">📍 Search Center Pin</div>
-                <div className="text-[10px] text-slate-600 mt-0.5">
-                  Showing festivals within {radiusKm} km
-                </div>
+            <Popup>
+              <div style={{ fontFamily: 'Inter, sans-serif', padding: '4px', textAlign: 'center' }}>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#121212', margin: '0 0 2px' }}>Search Center</p>
+                <p style={{ fontSize: '10px', color: '#6b7280', margin: 0 }}>Showing festivals within {radiusKm} km</p>
               </div>
             </Popup>
           </Marker>
+          {/* Origin City Pin (from Logistics panel) */}
+          {originCoords && (
+            <Marker position={originCoords} icon={OriginPinIcon}>
+              <Popup>
+                <div style={{ fontFamily: 'Inter, sans-serif', padding: '4px' }}>
+                  <p style={{ fontSize: '11px', fontWeight: 700, color: '#121212', margin: '0 0 2px' }}>Origin / Start City</p>
+                  <p style={{ fontSize: '10px', color: '#6b7280', margin: 0 }}>Your departure point</p>
+                </div>
+              </Popup>
+            </Marker>
+          )}
 
           {/* Discovered Festival Markers */}
           {festivals.map((festival) => {
             if (typeof festival.lat !== 'number' || typeof festival.lng !== 'number') return null;
             const isSelected = selectedFestival?.id === festival.id;
+            const isSaved = savedTrips.some(t => String(t.id) === String(festival.id));
             const isLocal = festival.source_name && festival.source_name.toLowerCase().includes('local');
             const dateDisplay = festival.start_date || festival.dates || '';
 
@@ -467,61 +466,64 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
                   },
                 }}
               >
-                <Popup className="custom-leaflet-popup">
-                  <div className="w-[210px] p-1 font-sans text-slate-900">
+              <Popup>
+                  <div style={{ width: '220px', padding: '4px', fontFamily: 'Inter, sans-serif', color: '#EDEDED' }}>
                     {(festival.image_url || festival.image) && (
-                      <div className="mb-2 h-24 w-full overflow-hidden rounded-lg bg-slate-100">
-                        <img
-                          src={festival.image_url || festival.image}
-                          alt={festival.name}
-                          className="h-full w-full object-cover"
-                        />
+                      <div style={{ marginBottom: '8px', height: '90px', overflow: 'hidden', borderRadius: '2px', border: '1px solid #2D2D2D' }}>
+                        <img src={festival.image_url || festival.image} alt={festival.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </div>
                     )}
-                    
-                    <div className="flex items-start justify-between gap-1.5 mb-1">
-                      <h4 className="text-xs font-bold leading-tight text-slate-900 flex-1">
-                        {festival.name}
-                      </h4>
+
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+                      <h4 style={{ fontSize: '0.8rem', fontWeight: 600, margin: 0, flex: 1, lineHeight: 1.2 }}>{festival.name}</h4>
+                      {onToggleSavedTrip && (
+                        <button
+                          onClick={e => handleToggle(e, festival)}
+                          title={isSaved ? 'Remove from My Trips' : 'Save to My Trips'}
+                          disabled={savingTripId === String(festival.id)}
+                          style={{ background: 'none', border: 'none', cursor: savingTripId === String(festival.id) ? 'not-allowed' : 'pointer', padding: '2px', opacity: savingTripId === String(festival.id) ? 0.7 : 1, display: 'flex', alignItems: 'center' }}
+                        >
+                          {savingTripId === String(festival.id) ? (
+                            <Loader2 size={16} className="animate-spin" style={{ color: '#10B981' }} />
+                          ) : isSaved ? (
+                            <BookmarkCheck size={16} style={{ color: '#10B981' }} />
+                          ) : (
+                            <Bookmark size={16} style={{ color: '#A1A1AA' }} />
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
                       {isLocal ? (
-                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-800 border border-emerald-300 shadow-sm">
-                          ✨ Niche/Exclusive
-                        </span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#10B981', border: '1px solid #10B981', padding: '1px 6px', borderRadius: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Niche</span>
                       ) : festival.source_name ? (
-                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold text-slate-700 border border-slate-300">
+                        <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#A1A1AA', backgroundColor: '#121212', border: '1px solid #2D2D2D', padding: '1px 6px', borderRadius: '2px', textTransform: 'uppercase', letterSpacing: '0.05em', maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={festival.source_name}>
                           {festival.source_name}
                         </span>
                       ) : null}
                     </div>
 
                     {dateDisplay && (
-                      <p className="mt-1.5 text-[11px] text-slate-600 flex items-center gap-1 font-medium">
-                        📅 <span>{dateDisplay}</span>
-                        {festival.end_date && festival.end_date !== dateDisplay && (
-                          <span> - {festival.end_date}</span>
-                        )}
+                      <p style={{ fontSize: '0.7rem', color: '#A1A1AA', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: '4px', lineHeight: 1.4 }}>
+                        <span>{dateDisplay}</span>
+                        {festival.end_date && festival.end_date !== dateDisplay && <span>– {festival.end_date}</span>}
                       </p>
                     )}
 
-                    <div className="mt-3 flex items-center justify-between gap-2 border-t pt-2 border-slate-200">
-                      {festival.url && (
-                        <a
-                          href={festival.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600 hover:underline"
-                        >
-                          <span>Tickets</span>
-                          <ExternalLink className="h-2.5 w-2.5" />
+                    <div style={{ paddingTop: '10px', borderTop: '1px solid #2D2D2D', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      {festival.url ? (
+                        <a href={festival.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.7rem', fontWeight: 600, color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
+                          Tickets <ExternalLink size={10} />
                         </a>
+                      ) : (
+                        <span />
                       )}
                       <button
-                        type="button"
                         onClick={() => onSelectFestival(festival)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white shadow hover:bg-emerald-700 transition-colors"
+                        style={{ fontSize: '0.7rem', fontWeight: 600, color: '#121212', backgroundColor: '#10B981', border: 'none', padding: '4px 12px', borderRadius: '2px', cursor: 'pointer' }}
                       >
-                        <Sparkles className="h-2.5 w-2.5" />
-                        <span>Ask AI about this</span>
+                        Open Chat
                       </button>
                     </div>
                   </div>
@@ -531,15 +533,30 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
           })}
         </MapContainer>
 
-        {/* Floating Suggestion Button over the map */}
-        <div className="absolute bottom-4 right-4 z-[1000]">
+        {/* Floating suggest button */}
+        <div style={{ position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000 }}>
           <button
-            type="button"
-            onClick={() => (onOpenSuggestModal ? onOpenSuggestModal() : setIsSuggestModalOpen(true))}
-            className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/60 bg-[#111412]/95 px-4 py-2.5 text-xs font-bold text-emerald-400 shadow-2xl backdrop-blur-md hover:bg-emerald-500 hover:text-black hover:scale-105 transition-all group"
+            onClick={() => onOpenSuggestModal ? onOpenSuggestModal() : setIsSuggestModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              fontSize: '0.7rem',
+              fontWeight: 600,
+              color: '#10B981',
+              backgroundColor: 'rgba(18,18,18,0.92)',
+              border: '1px solid #2D2D2D',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#10B981'; e.currentTarget.style.color = '#121212'; }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(18,18,18,0.92)'; e.currentTarget.style.color = '#10B981'; }}
           >
-            <Sparkles className="h-3.5 w-3.5 text-emerald-400 group-hover:text-black" />
-            <span>Missing a festival? Suggest it here!</span>
+            <Sparkles size={12} />
+            Missing a festival? Suggest it
           </button>
         </div>
       </div>
@@ -550,19 +567,33 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
         onClose={() => setIsSuggestModalOpen(false)}
       />
 
-      {/* ── FOOTER STATUS BAR ── */}
-      <div className="flex items-center justify-between border-t border-white/10 bg-[#0d0f0e] px-4 py-2.5 text-[11px] text-slate-400">
-        <div className="flex items-center gap-2">
-          <Info className="h-3.5 w-3.5 text-emerald-400" />
-          <span>Found <strong className="text-white font-semibold">{festivals.length}</strong> festivals within {radiusKm} km</span>
-        </div>
+      {/* Status bar */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 16px',
+          borderTop: '1px solid #2D2D2D',
+          backgroundColor: '#1E1E1E',
+          flexShrink: 0,
+        }}
+      >
+        <span style={{ fontSize: '0.7rem', color: '#A1A1AA', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Info size={11} style={{ color: '#10B981' }} />
+          <strong style={{ color: '#EDEDED' }}>{festivals.length}</strong>&nbsp;festivals within {radiusKm} km
+        </span>
         <button
-          type="button"
           onClick={() => fetchFestivals(pin.lat, pin.lng, radiusKm, startDate, endDate)}
-          className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '4px',
+            fontSize: '0.65rem', color: '#A1A1AA',
+            background: 'none', border: '1px solid #2D2D2D',
+            borderRadius: '2px', padding: '3px 8px', cursor: 'pointer',
+          }}
         >
-          <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
-          <span>Refresh Pins</span>
+          <RefreshCw size={10} style={{ animation: loading ? 'spin 0.8s linear infinite' : 'none' }} />
+          Refresh
         </button>
       </div>
     </div>
@@ -570,3 +601,18 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
 };
 
 export default DiscoveryMap;
+
+const inputStyle: React.CSSProperties = {
+  paddingLeft: '28px',
+  paddingRight: '8px',
+  paddingTop: '6px',
+  paddingBottom: '6px',
+  fontSize: '0.75rem',
+  backgroundColor: '#121212',
+  border: '1px solid #2D2D2D',
+  borderRadius: '2px',
+  color: '#EDEDED',
+  outline: 'none',
+  width: '100%',
+};
+
