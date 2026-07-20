@@ -4,11 +4,13 @@ import { LandingPage } from './pages/LandingPage';
 import { DiscoverPage } from './pages/DiscoverPage';
 import { MyTripsPage } from './pages/MyTripsPage';
 import { Layout } from './components/Layout';
+import { UpgradeModal } from './components/UpgradeModal';
 import './App.css';
 
 function App() {
   return (
     <BrowserRouter>
+      <UpgradeModal />
       <Routes>
         {/* Public */}
         <Route path="/" element={<LandingPage />} />

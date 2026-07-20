@@ -4,6 +4,8 @@ import logging
 import math
 from typing import Any, Dict, List, Tuple
 import httpx
+import polyline
+import os
 
 logger = logging.getLogger("festival_planner.services.transport")
 
@@ -168,225 +170,100 @@ async def get_car_route(lat1: float, lon1: float, lat2: float, lon2: float) -> D
     }
 
 
-def _query_pyhafas_sync(
-    origin_name: str,
-    dest_name: str,
-    departure_datetime: str,
-    origin_lat: float = 0.0,
-    origin_lng: float = 0.0,
-    dest_lat: float = 0.0,
-    dest_lng: float = 0.0
-) -> List[Dict[str, Any]]:
-    """Synchronous worker for pyhafas journeys lookup using DBProfile or fallback profiles."""
-    from pyhafas import HafasClient
-    from pyhafas.profile import DBProfile, NASAProfile
+async def get_google_directions(
+    origin: str,
+    destination: str,
+    mode: str = "transit"
+) -> Dict[str, Any]:
+    # Sanitize inputs to prevent API NOT_FOUND errors from messy LLM strings
+    clean_origin = origin.split('|')[0].replace('pass', '').replace('2-day', '').strip() if origin else origin
+    clean_destination = destination.split('|')[0].replace('pass', '').replace('2-day', '').strip() if destination else destination
 
-    # Try DBProfile first as required, fallback to NASAProfile if DB endpoint (reiseauskunft.bahn.de) fails DNS/connection
-    profiles_to_try = [DBProfile(), NASAProfile()]
+    from app.core.config import settings
+    api_key = settings.GOOGLE_MAPS_API_KEY
+    if not api_key:
+        logger.error("❌ [get_google_directions] Missing GOOGLE_MAPS_API_KEY in configuration.")
+        return {"status": "error", "message": "Google Maps API key is missing."}
+
+    url = f"https://maps.googleapis.com/maps/api/directions/json"
+    params = {
+        "origin": clean_origin,
+        "destination": clean_destination,
+        "mode": mode,
+        "key": api_key
+    }
     
-    # Parse departure datetime
     try:
-        if len(departure_datetime) == 10:  # YYYY-MM-DD
-            dt = datetime.datetime.strptime(departure_datetime, "%Y-%m-%d")
-            dt = dt.replace(hour=8, minute=0)  # default morning departure
-        else:
-            dt = datetime.datetime.fromisoformat(departure_datetime)
-    except Exception:
-        dt = datetime.datetime.now()
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, params=params, timeout=15.0)
+            if resp.status_code != 200:
+                logger.warning(f"⚠️ [get_google_directions] HTTP {resp.status_code}: {resp.text}")
+                return {"status": "error", "message": "Google Directions API is temporarily unavailable."}
+            data = resp.json()
+            logger.warning(f"data: {data}")
+            if data.get("status") != "OK" or not data.get("routes"):
+                err_status = data.get("status", "Unknown Error")
+                logger.warning(f"⚠️ [get_google_directions] API returned {err_status} for {origin} to {destination}")
+                return {"status": "error", "message": f"Could not find a transit route from {origin} to {destination}."}
 
-    for profile in profiles_to_try:
-        try:
-            client = HafasClient(profile)
-            orig_locs = client.locations(origin_name)
-            dest_locs = client.locations(dest_name)
-            if not orig_locs or not dest_locs:
-                continue
+            route = data["routes"][0]
+            leg = route["legs"][0]
 
-            orig_station = orig_locs[0]
-            dest_station = dest_locs[0]
-
-            journeys = client.journeys(orig_station, dest_station, dt)
-            if not journeys:
-                continue
-
-            # Sort journeys by duration
-            sorted_journeys = sorted(journeys, key=lambda j: getattr(j, "duration", datetime.timedelta(days=99)))[:3]
-
-            results = []
-            for j in sorted_journeys:
-                dep_time = getattr(j, "date", dt)
-                arr_time = dep_time + getattr(j, "duration", datetime.timedelta(hours=3))
+            duration_str = leg.get("duration", {}).get("text", "Unknown")
+            distance_str = leg.get("distance", {}).get("text", "Unknown")
+            
+            parsed_steps = []
+            for step in leg.get("steps", []):
+                step_mode = step.get("travel_mode", "UNKNOWN")
+                poly_points = step.get("polyline", {}).get("points", "")
+                step_coords = polyline.decode(poly_points) if poly_points else []
                 
-                legs = getattr(j, "legs", [])
-                transfers = max(0, len(legs) - 1) if legs else 0
-                
-                if legs:
-                    first_leg = legs[0]
-                    last_leg = legs[-1]
-                    if hasattr(first_leg, "departure") and first_leg.departure:
-                        dep_time = first_leg.departure
-                    if hasattr(last_leg, "arrival") and last_leg.arrival:
-                        arr_time = last_leg.arrival
-
-                dur_td = getattr(j, "duration", arr_time - dep_time)
-                total_seconds = int(dur_td.total_seconds()) if hasattr(dur_td, "total_seconds") else 10800
-                hours = total_seconds // 3600
-                minutes = (total_seconds % 3600) // 60
-                dur_str = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
-
-                extracted_legs = []
-                path_coords = []
-                for idx, leg in enumerate(legs):
-                    orig_st = getattr(leg, "origin", None)
-                    orig_name = getattr(orig_st, "name", "Origin") if orig_st else (origin_name if idx == 0 else "Transfer Station")
-                    orig_lat_val = float(getattr(orig_st, "latitude", 0.0) or 0.0) if orig_st else (origin_lat if idx == 0 else 0.0)
-                    orig_lng_val = float(getattr(orig_st, "longitude", 0.0) or 0.0) if orig_st else (origin_lng if idx == 0 else 0.0)
-
-                    dest_st = getattr(leg, "destination", None)
-                    dest_name_str = getattr(dest_st, "name", "Destination") if dest_st else (dest_name if idx == len(legs) - 1 else "Transfer Station")
-                    dest_lat_val = float(getattr(dest_st, "latitude", 0.0) or 0.0) if dest_st else (dest_lat if idx == len(legs) - 1 else 0.0)
-                    dest_lng_val = float(getattr(dest_st, "longitude", 0.0) or 0.0) if dest_st else (dest_lng if idx == len(legs) - 1 else 0.0)
-
-                    train_carrier = getattr(leg, "name", None) or getattr(leg, "train_name", None) or getattr(leg, "direction", None) or "Express Train"
-                    leg_dep = leg.departure.strftime("%H:%M") if hasattr(leg, "departure") and isinstance(leg.departure, datetime.datetime) else ""
-                    leg_arr = leg.arrival.strftime("%H:%M") if hasattr(leg, "arrival") and isinstance(leg.arrival, datetime.datetime) else ""
-
-                    extracted_legs.append({
-                        "origin": {"name": orig_name, "lat": orig_lat_val, "lng": orig_lng_val},
-                        "destination": {"name": dest_name_str, "lat": dest_lat_val, "lng": dest_lng_val},
-                        "train_name": str(train_carrier),
-                        "departure": leg_dep,
-                        "arrival": leg_arr
+                if step_mode == "WALKING":
+                    parsed_steps.append({
+                        "mode": "WALKING",
+                        "duration": step.get("duration", {}).get("text", ""),
+                        "instruction": step.get("html_instructions", ""),
+                        "polyline": step_coords
+                    })
+                elif step_mode == "TRANSIT":
+                    transit_details = step.get("transit_details", {})
+                    line = transit_details.get("line", {})
+                    parsed_steps.append({
+                        "mode": line.get("vehicle", {}).get("type", "TRANSIT"),
+                        "line_name": line.get("short_name") or line.get("name") or "Transit",
+                        "color": line.get("color", "#3b82f6"),
+                        "departure_stop": transit_details.get("departure_stop", {}).get("name", ""),
+                        "departure_time": transit_details.get("departure_time", {}).get("text", ""),
+                        "arrival_stop": transit_details.get("arrival_stop", {}).get("name", ""),
+                        "arrival_time": transit_details.get("arrival_time", {}).get("text", ""),
+                        "duration": step.get("duration", {}).get("text", ""),
+                        "polyline": step_coords,
+                        "start_location": [
+                            step.get("start_location", {}).get("lat", 0),
+                            step.get("start_location", {}).get("lng", 0)
+                        ]
+                    })
+                else:
+                    parsed_steps.append({
+                        "mode": step_mode,
+                        "duration": step.get("duration", {}).get("text", ""),
+                        "instruction": step.get("html_instructions", ""),
+                        "polyline": step_coords
                     })
 
-                    if orig_lat_val and orig_lng_val and (not path_coords or path_coords[-1] != [orig_lat_val, orig_lng_val]):
-                        path_coords.append([orig_lat_val, orig_lng_val])
-                    if dest_lat_val and dest_lng_val and (not path_coords or path_coords[-1] != [dest_lat_val, dest_lng_val]):
-                        path_coords.append([dest_lat_val, dest_lng_val])
+            overview_polyline_points = route.get("overview_polyline", {}).get("points", "")
+            route_coords = polyline.decode(overview_polyline_points) if overview_polyline_points else []
 
-                # If path_coords is empty or missing end points, ensure origin and dest are present
-                if not path_coords or len(path_coords) < 2:
-                    if origin_lat and origin_lng and dest_lat and dest_lng:
-                        path_coords = [[origin_lat, origin_lng], [dest_lat, dest_lng]]
-                if not extracted_legs:
-                    extracted_legs = [{
-                        "origin": {"name": origin_name, "lat": origin_lat, "lng": origin_lng},
-                        "destination": {"name": dest_name, "lat": dest_lat, "lng": dest_lng},
-                        "train_name": "Express Direct",
-                        "departure": dep_time.strftime("%H:%M") if isinstance(dep_time, datetime.datetime) else str(dep_time),
-                        "arrival": arr_time.strftime("%H:%M") if isinstance(arr_time, datetime.datetime) else str(arr_time)
-                    }]
+            logger.info(f"🚆 [get_google_directions] Success: {origin} -> {destination} | {duration_str}")
 
-                results.append({
-                    "departure_time": dep_time.strftime("%Y-%m-%d %H:%M") if isinstance(dep_time, datetime.datetime) else str(dep_time),
-                    "arrival_time": arr_time.strftime("%Y-%m-%d %H:%M") if isinstance(arr_time, datetime.datetime) else str(arr_time),
-                    "duration": dur_str,
-                    "transfers": transfers,
-                    "provider": type(profile).__name__,
-                    "legs": extracted_legs,
-                    "path_coordinates": path_coords
-                })
+            return {
+                "status": "success",
+                "total_duration": duration_str,
+                "distance": distance_str,
+                "steps": parsed_steps,
+                "route_coordinates": route_coords
+            }
 
-            if results:
-                logger.info(f"🚆 [_query_pyhafas_sync] Found {len(results)} journeys via {type(profile).__name__}")
-                return results
-
-        except Exception as e:
-            logger.warning(f"⚠️ [_query_pyhafas_sync] Profile {type(profile).__name__} query failed: {e}")
-
-    return []
-
-
-async def get_train_routes(
-    origin_name: str,
-    dest_name: str,
-    departure_datetime: str,
-    origin_lat: float = 0.0,
-    origin_lng: float = 0.0,
-    dest_lat: float = 0.0,
-    dest_lng: float = 0.0
-) -> List[Dict[str, Any]]:
-    """Get top 3 fastest train connections between origin and destination using European/PKP train data via pyhafas."""
-    try:
-        routes = await asyncio.to_thread(
-            _query_pyhafas_sync, origin_name, dest_name, departure_datetime, origin_lat, origin_lng, dest_lat, dest_lng
-        )
-        if routes:
-            return routes
     except Exception as e:
-        logger.warning(f"⚠️ [get_train_routes] Async thread query failed: {e}")
-
-    # Fallback simulated schedule with full legs and path_coordinates if live Hafas queries fail
-    logger.info(f"🚆 [get_train_routes] Generating estimated timetable with legs between {origin_name} and {dest_name}")
-    try:
-        dt = datetime.datetime.strptime(departure_datetime[:10], "%Y-%m-%d").replace(hour=8, minute=15)
-    except Exception:
-        dt = datetime.datetime.now().replace(hour=8, minute=15)
-
-    mid_lat = (origin_lat + dest_lat) / 2 + 0.12 if origin_lat and dest_lat else 52.3
-    mid_lng = (origin_lng + dest_lng) / 2 - 0.08 if origin_lng and dest_lng else 19.5
-    mid_station_name = f"Poznań Główny / Interchange ({origin_name} - {dest_name})"
-
-    return [
-        {
-            "departure_time": dt.strftime("%Y-%m-%d %H:%M"),
-            "arrival_time": (dt + datetime.timedelta(hours=3, minutes=45)).strftime("%Y-%m-%d %H:%M"),
-            "duration": "3h 45m",
-            "transfers": 0,
-            "connection_type": "Direct InterCity / Express (Estimated)",
-            "provider": "PKP Intercity / DB",
-            "legs": [
-                {
-                    "origin": {"name": origin_name, "lat": origin_lat, "lng": origin_lng},
-                    "destination": {"name": dest_name, "lat": dest_lat, "lng": dest_lng},
-                    "train_name": "EIC 1502 Chrobry",
-                    "departure": dt.strftime("%H:%M"),
-                    "arrival": (dt + datetime.timedelta(hours=3, minutes=45)).strftime("%H:%M")
-                }
-            ],
-            "path_coordinates": [[origin_lat, origin_lng], [dest_lat, dest_lng]] if origin_lat and dest_lat else []
-        },
-        {
-            "departure_time": (dt + datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M"),
-            "arrival_time": (dt + datetime.timedelta(hours=6, minutes=10)).strftime("%Y-%m-%d %H:%M"),
-            "duration": "4h 10m",
-            "transfers": 1,
-            "connection_type": "Regional / InterCity with 1 Transfer (Estimated)",
-            "provider": "PKP / Polregio",
-            "legs": [
-                {
-                    "origin": {"name": origin_name, "lat": origin_lat, "lng": origin_lng},
-                    "destination": {"name": mid_station_name, "lat": mid_lat, "lng": mid_lng},
-                    "train_name": "TLK 53102 Regional",
-                    "departure": (dt + datetime.timedelta(hours=2)).strftime("%H:%M"),
-                    "arrival": (dt + datetime.timedelta(hours=3, minutes=50)).strftime("%H:%M")
-                },
-                {
-                    "origin": {"name": mid_station_name, "lat": mid_lat, "lng": mid_lng},
-                    "destination": {"name": dest_name, "lat": dest_lat, "lng": dest_lng},
-                    "train_name": "IC 2510 Express",
-                    "departure": (dt + datetime.timedelta(hours=4, minutes=10)).strftime("%H:%M"),
-                    "arrival": (dt + datetime.timedelta(hours=6, minutes=10)).strftime("%H:%M")
-                }
-            ],
-            "path_coordinates": [[origin_lat, origin_lng], [mid_lat, mid_lng], [dest_lat, dest_lng]] if origin_lat and dest_lat else []
-        },
-        {
-            "departure_time": (dt + datetime.timedelta(hours=5)).strftime("%Y-%m-%d %H:%M"),
-            "arrival_time": (dt + datetime.timedelta(hours=8, minutes=30)).strftime("%Y-%m-%d %H:%M"),
-            "duration": "3h 30m",
-            "transfers": 0,
-            "connection_type": "Afternoon Direct Express (Estimated)",
-            "provider": "PKP Intercity / EIP",
-            "legs": [
-                {
-                    "origin": {"name": origin_name, "lat": origin_lat, "lng": origin_lng},
-                    "destination": {"name": dest_name, "lat": dest_lat, "lng": dest_lng},
-                    "train_name": "EIP 4500 Pendolino Direct",
-                    "departure": (dt + datetime.timedelta(hours=5)).strftime("%H:%M"),
-                    "arrival": (dt + datetime.timedelta(hours=8, minutes=30)).strftime("%H:%M")
-                }
-            ],
-            "path_coordinates": [[origin_lat, origin_lng], [dest_lat, dest_lng]] if origin_lat and dest_lat else []
-        }
-    ]
+        logger.warning(f"⚠️ [get_google_directions] Query failed: {e}")
+        return {"status": "error", "message": "Transit routing is temporarily unavailable due to a network error."}

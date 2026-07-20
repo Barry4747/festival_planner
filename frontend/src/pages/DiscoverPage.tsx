@@ -1,28 +1,45 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/axios';
 import { DiscoveryMap, type FestivalItem } from '../components/DiscoveryMap';
 import { AIChat } from '../components/AIChat';
+import { WeatherPanel } from '../components/WeatherPanel';
 import { LogisticsPanel } from '../components/LogisticsPanel';
-import { Bookmark, BookmarkCheck, ExternalLink, MapPin, Calendar, Tag, Loader2 } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ExternalLink, MapPin, Calendar, Tag, Loader2, X } from 'lucide-react';
 import { usePlannerStore } from '../store/usePlannerStore';
+import { useTranslation } from 'react-i18next';
+import gsap from 'gsap';
 
-type RightTab = 'chat' | 'logistics' | 'details';
 
-const TAB_LABELS: { id: RightTab; label: string }[] = [
-  { id: 'chat', label: 'Chat' },
-  { id: 'logistics', label: 'Logistics' },
-  { id: 'details', label: 'Details' },
-];
 
 export const DiscoverPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedFestival, setSelectedFestival] = useState<FestivalItem | null>(null);
   const [savedTrips, setSavedTrips] = useState<FestivalItem[]>([]);
   const [savingTripId, setSavingTripId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<RightTab>('chat');
-  const { routeData, transportMode, selectedTrainIndex } = usePlannerStore();
+  const { routeData, transportMode, selectedTrainIndex, activeTab, setActiveTab } = usePlannerStore();
+  const { t } = useTranslation();
+
+  const mapRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    if (mapRef.current) {
+      tl.fromTo(mapRef.current, { scale: 0.97, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.0 }, 0.3);
+    }
+    if (panelRef.current) {
+      tl.fromTo(panelRef.current, { x: 30, opacity: 0 }, { x: 0, opacity: 1, duration: 0.9 }, 0.45);
+    }
+  }, []);
+
+  const TAB_LABELS: { id: 'chat' | 'logistics' | 'details' | 'weather'; label: string }[] = [
+    { id: 'chat', label: t('tabs.chat') },
+    { id: 'logistics', label: t('tabs.logistics') },
+    { id: 'details', label: t('tabs.details') },
+    { id: 'weather', label: t('tabs.weather') },
+  ];
 
   // Fetch saved trips
   const fetchSavedTrips = useCallback(async () => {
@@ -98,7 +115,7 @@ export const DiscoverPage: React.FC = () => {
       }}
     >
       {/* ── LEFT: MAP (65%) ── */}
-      <div style={{ flex: '0 0 65%', position: 'relative', overflow: 'hidden' }}>
+      <div ref={mapRef} style={{ flex: '0 0 65%', position: 'relative', overflow: 'hidden', opacity: 0 }}>
         <DiscoveryMap
           selectedFestival={selectedFestival}
           onSelectFestival={handleSelectFestival}
@@ -115,6 +132,7 @@ export const DiscoverPage: React.FC = () => {
 
       {/* ── RIGHT PANEL (35%) ── */}
       <div
+        ref={panelRef}
         style={{
           flex: '0 0 35%',
           display: 'flex',
@@ -122,6 +140,7 @@ export const DiscoverPage: React.FC = () => {
           backgroundColor: '#1E1E1E',
           borderLeft: '1px solid #2D2D2D',
           overflow: 'hidden',
+          opacity: 0,
         }}
       >
         {selectedFestival ? (
@@ -150,21 +169,31 @@ export const DiscoverPage: React.FC = () => {
                   </p>
                 )}
               </div>
-              <button
-                onClick={() => handleToggleSavedTrip(selectedFestival)}
-                disabled={savingTripId === String(selectedFestival.id)}
-                title={isSaved ? 'Remove from My Trips' : 'Save to My Trips'}
-                className="transition-colors flex-shrink-0"
-                style={{ color: isSaved ? '#10B981' : '#A1A1AA', padding: '4px', background: 'none', border: 'none', cursor: savingTripId === String(selectedFestival.id) ? 'not-allowed' : 'pointer', opacity: savingTripId === String(selectedFestival.id) ? 0.7 : 1 }}
-              >
-                {savingTripId === String(selectedFestival.id) ? (
-                  <Loader2 size={18} className="animate-spin text-[#10B981]" />
-                ) : isSaved ? (
-                  <BookmarkCheck size={18} />
-                ) : (
-                  <Bookmark size={18} />
-                )}
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={() => handleToggleSavedTrip(selectedFestival)}
+                  disabled={savingTripId === String(selectedFestival.id)}
+                  title={isSaved ? 'Remove from My Trips' : 'Save to My Trips'}
+                  className="transition-colors flex-shrink-0"
+                  style={{ color: isSaved ? '#10B981' : '#A1A1AA', padding: '4px', background: 'none', border: 'none', cursor: savingTripId === String(selectedFestival.id) ? 'not-allowed' : 'pointer', opacity: savingTripId === String(selectedFestival.id) ? 0.7 : 1 }}
+                >
+                  {savingTripId === String(selectedFestival.id) ? (
+                    <Loader2 size={18} className="animate-spin text-[#10B981]" />
+                  ) : isSaved ? (
+                    <BookmarkCheck size={18} />
+                  ) : (
+                    <Bookmark size={18} />
+                  )}
+                </button>
+                <button
+                  onClick={() => handleSelectFestival(null)}
+                  title="Close panel"
+                  className="transition-colors flex-shrink-0 hover:text-white"
+                  style={{ color: '#A1A1AA', padding: '4px', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Tab bar */}
@@ -175,26 +204,39 @@ export const DiscoverPage: React.FC = () => {
                 padding: '0 20px',
               }}
             >
-              {TAB_LABELS.map(({ id, label }) => (
+            {TAB_LABELS.map(({ id, label }) => (
                 <button
                   key={id}
                   onClick={() => setActiveTab(id)}
                   style={{
                     flex: 1,
                     padding: '10px 0',
-                    fontSize: '0.75rem',
-                    fontWeight: 500,
-                    letterSpacing: '0.05em',
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    letterSpacing: '0.06em',
                     textTransform: 'uppercase' as const,
                     color: activeTab === id ? '#10B981' : '#A1A1AA',
-                    background: 'none',
+                    background: activeTab === id ? 'rgba(16,185,129,0.06)' : 'none',
                     borderTop: 'none',
                     borderLeft: 'none',
                     borderRight: 'none',
                     borderBottom: activeTab === id ? '2px solid #10B981' : '2px solid transparent',
                     cursor: 'pointer',
-                    transition: 'color 0.15s',
+                    transition: 'all 0.25s ease',
                     outline: 'none',
+                    textShadow: activeTab === id ? '0 0 12px rgba(16,185,129,0.5)' : 'none',
+                  }}
+                  onMouseEnter={e => {
+                    if (activeTab !== id) {
+                      (e.currentTarget as HTMLButtonElement).style.color = '#EDEDED';
+                      (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.03)';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (activeTab !== id) {
+                      (e.currentTarget as HTMLButtonElement).style.color = '#A1A1AA';
+                      (e.currentTarget as HTMLButtonElement).style.background = 'none';
+                    }
                   }}
                 >
                   {label}
@@ -207,7 +249,6 @@ export const DiscoverPage: React.FC = () => {
               {activeTab === 'chat' && (
                 <AIChat
                   selectedFestival={selectedFestival}
-                  onClearSelection={() => handleSelectFestival(null)}
                 />
               )}
               {activeTab === 'logistics' && (
@@ -215,6 +256,9 @@ export const DiscoverPage: React.FC = () => {
               )}
               {activeTab === 'details' && (
                 <DetailsPanel festival={selectedFestival} />
+              )}
+              {activeTab === 'weather' && (
+                <WeatherPanel festival={selectedFestival} />
               )}
             </div>
           </>

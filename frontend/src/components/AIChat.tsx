@@ -3,12 +3,11 @@ import { api } from '../lib/axios';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { FestivalItem } from './DiscoveryMap';
-import { Send, Loader2, Bot, User, Trash2, ExternalLink, HelpCircle } from 'lucide-react';
+import { Send, Loader2, Bot, User, Trash2, ExternalLink } from 'lucide-react';
 import { usePlannerStore } from '../store/usePlannerStore';
 
 interface AIChatProps {
   selectedFestival: FestivalItem | null;
-  onClearSelection?: () => void;
   onMinimize?: () => void;
   onClose?: () => void;
 }
@@ -48,11 +47,11 @@ const formatMessageContent = (raw: any): string => {
 
 export const AIChat: React.FC<AIChatProps> = ({
   selectedFestival,
-  onClearSelection,
   onMinimize,
 }) => {
   const setDepartureCity = usePlannerStore((state) => state.setDepartureCity);
   const setRouteData = usePlannerStore((state) => state.setRouteData);
+  const setActiveRouteCoords = usePlannerStore((state) => state.setActiveRouteCoords);
   const setWeatherForecast = usePlannerStore((state) => state.setWeatherForecast);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -156,6 +155,12 @@ export const AIChat: React.FC<AIChatProps> = ({
           coordinates: response.data.route_geometry || null,
           transportData: stdTransportData,
         });
+
+        if (stdTransportData?.train?.steps) {
+          setActiveRouteSteps(stdTransportData.train.steps);
+        } else {
+          setActiveRouteSteps(null);
+        }
       }
 
       if (response.data?.weather_forecast) {
@@ -217,67 +222,25 @@ export const AIChat: React.FC<AIChatProps> = ({
             AI Concierge
           </span>
         </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <FlatIconBtn onClick={handleClear} title="Clear thread"><Trash2 size={13} /></FlatIconBtn>
-          {onMinimize && <FlatIconBtn onClick={onMinimize} title="Minimize">–</FlatIconBtn>}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {selectedFestival?.url && (
+            <a
+              href={selectedFestival.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: '#10B981', textDecoration: 'none', marginRight: '4px' }}
+            >
+              Tickets <ExternalLink size={10} />
+            </a>
+          )}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <FlatIconBtn onClick={handleClear} title="Clear thread"><Trash2 size={13} /></FlatIconBtn>
+            {onMinimize && <FlatIconBtn onClick={onMinimize} title="Minimize">–</FlatIconBtn>}
+          </div>
         </div>
       </div>
 
-      {/* Context strip */}
-      {selectedFestival ? (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '8px 16px',
-            borderBottom: '1px solid #2D2D2D',
-            backgroundColor: '#1A1A1A',
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10B981', flexShrink: 0 }} />
-            <span style={{ fontSize: '0.7rem', color: '#EDEDED', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              <span style={{ color: '#A1A1AA', marginRight: '4px' }}>Talking about:</span>
-              <strong>{selectedFestival.name}</strong>
-              {selectedFestival.dates && <span style={{ color: '#A1A1AA' }}> ({selectedFestival.dates})</span>}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-            {selectedFestival.url && (
-              <a
-                href={selectedFestival.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.65rem', color: '#10B981', textDecoration: 'none' }}
-              >
-                Tickets <ExternalLink size={10} />
-              </a>
-            )}
-            {onClearSelection && (
-              <button onClick={onClearSelection} style={{ color: '#A1A1AA', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>
-                ×
-              </button>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '8px 16px',
-            borderBottom: '1px solid #2D2D2D',
-            backgroundColor: '#1A1A1A',
-            flexShrink: 0,
-          }}
-        >
-          <HelpCircle size={12} style={{ color: '#A1A1AA', flexShrink: 0 }} />
-          <span style={{ fontSize: '0.7rem', color: '#A1A1AA' }}>No festival selected — talking generally.</span>
-        </div>
-      )}
+
 
       {/* Messages */}
       <div

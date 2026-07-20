@@ -6,11 +6,14 @@ from app.services.transport import (
     geocode_city,
     reverse_geocode_coords,
     get_car_route,
-    get_train_routes,
+    get_google_directions,
 )
 
 router = APIRouter()
 
+
+from fastapi import APIRouter, Query, Depends
+from app.core.rate_limit import check_rate_limit
 
 @router.get("/routes")
 async def get_transport_routes(
@@ -19,6 +22,7 @@ async def get_transport_routes(
     dest_lng: float = Query(..., description="Destination longitude"),
     date: str = Query(..., description="Departure date YYYY-MM-DD"),
     dest_name: Optional[str] = Query(None, description="Optional destination city or festival name"),
+    _rate_limit: dict = Depends(check_rate_limit("google_maps"))
 ) -> Dict[str, Any]:
     """Calculate driving routes (OSRM) and train connections (Hafas) between an origin city and destination coordinates."""
     # 1. Geocode origin city to get its lat/lng
@@ -29,9 +33,9 @@ async def get_transport_routes(
     if not target_name:
         target_name = await reverse_geocode_coords(dest_lat, dest_lng)
 
-    # 2. Run get_car_route and get_train_routes concurrently
+    # 2. Run get_car_route and get_google_directions concurrently
     car_task = get_car_route(origin_lat, origin_lng, dest_lat, dest_lng)
-    train_task = get_train_routes(origin_city, target_name, date, origin_lat, origin_lng, dest_lat, dest_lng)
+    train_task = get_google_directions(origin_city, target_name, mode="transit")
 
     car_data, train_data = await asyncio.gather(car_task, train_task)
 
@@ -48,11 +52,12 @@ async def get_transport_routes(
     }
 
     train_response = {
-        "itineraries": train_data if isinstance(train_data, list) else [],
-        "origin_coords": [origin_lat, origin_lng],
-        "dest_coords": [dest_lat, dest_lng],
-        "origin_name": origin_city,
-        "dest_name": target_name,
+        "total_duration": train_data.get("total_duration", "") if isinstance(train_data, dict) else "",
+        "distance": train_data.get("distance", "") if isinstance(train_data, dict) else "",
+        "route_coordinates": train_data.get("route_coordinates", []) if isinstance(train_data, dict) else [],
+        "steps": train_data.get("steps", []) if isinstance(train_data, dict) else [],
+        "status": train_data.get("status", "success") if isinstance(train_data, dict) else "error",
+        "message": train_data.get("message") if isinstance(train_data, dict) else None,
     }
 
     return {

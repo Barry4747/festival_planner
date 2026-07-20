@@ -1,7 +1,8 @@
 import asyncio
 import json
 import logging
-from typing import Any, Dict, Optional, List
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from app.agents.state import PlannerState
@@ -43,7 +44,7 @@ async def search_artist_events(artist_name: str) -> dict:
 
 from app.services.aggregator import FestivalAggregator
 from app.services.festival_sources import TicketmasterSource, SupabaseSource, LocalDbSource
-from app.services.transport import get_car_route, get_train_routes, geocode_city
+from app.services.transport import get_car_route, get_google_directions, geocode_city
 
 
 def _get_coords_for_location(location_type: str, location_value: str) -> tuple[float, float, float]:
@@ -157,11 +158,11 @@ async def get_travel_options(
     """Calculate and compare travel options (Car and Train) between an origin city and the festival destination.
 
     Args:
-        origin_city: The starting city of the user (e.g., 'Warsaw').
-        destination_city: The festival city or destination city (e.g., 'Berlin' or 'Gdynia').
+        origin_city: The starting city or town name (e.g., 'Gorzów Śląski'). CRITICAL: This must be a clean geographical location (City, Street, or valid POI). You MUST extract ONLY the city name (e.g., 'Płock, Poland'). You are STRICTLY FORBIDDEN from including event names, dates, pipe characters (|), or ticket types (e.g., '2-day pass') in this string, or the API will fail.
+        destination_city: The destination city (e.g., 'Płock'). CRITICAL: This must be a clean geographical location (City, Street, or valid POI). You MUST extract ONLY the city name (e.g., 'Płock, Poland'). You are STRICTLY FORBIDDEN from including event names, dates, pipe characters (|), or ticket types (e.g., '2-day pass') in this string, or the API will fail.
         destination_lat: Latitude coordinate of the festival destination.
         destination_lng: Longitude coordinate of the festival destination.
-        date: Departure or festival date in YYYY-MM-DD format (e.g., '2026-07-15').
+        date: The exact date of travel in YYYY-MM-DD format.
 
     Returns:
         A combined JSON string containing detailed car driving estimates (time, distance, fuel cost) and top 3 train connections.
@@ -173,7 +174,7 @@ async def get_travel_options(
     orig_lat, orig_lng = await geocode_city(origin_city)
 
     car_route_task = get_car_route(orig_lat, orig_lng, destination_lat, destination_lng)
-    train_routes_task = get_train_routes(origin_city, destination_city, date)
+    train_routes_task = get_google_directions(origin_city, destination_city, "transit")
 
     car_data, train_data = await asyncio.gather(car_route_task, train_routes_task)
 
@@ -197,18 +198,20 @@ async def get_travel_options(
     return response_json
 
 @tool
-async def fetch_weather_forecast(city: str) -> dict:
+async def fetch_weather_forecast(city: str, date: str) -> dict:
     """Use this tool to fetch the 5-day weather forecast for a specific city. Call this when the user asks about festival weather or logistics.
+    ONLY use this tool if the festival/event date is within the next 5 days from today. If the event is more than 5 days in the future, DO NOT call this tool. Instead, rely on your internal knowledge to provide the historical average weather/climate for that specific month and location.
     
     Args:
         city: The name of the city to get the forecast for (e.g., 'Berlin', 'Warsaw').
+        date: The date of the event in YYYY-MM-DD format.
     """
     print(f"\n=======================================================")
     print(f"[TOOL CALL EXECUTING] Tool: fetch_weather_forecast | City: '{city}'")
     logger.info(f"🛠️ [TOOL CALL EXECUTING] Tool: fetch_weather_forecast | City: '{city}'")
     
     from app.services.weather import fetch_weather
-    response = await fetch_weather(city)
+    response = await fetch_weather(city, date)
     
     print(f"[TOOL RESPONSE] Weather API Response for '{city}':\n{json.dumps(response, indent=2)}")
     print(f"=======================================================\n")
@@ -233,11 +236,12 @@ async def lineup_node(state: PlannerState) -> dict:
     genres_str = ", ".join(music_genres) if isinstance(music_genres, list) else str(music_genres)
 
     system_prompt = f"""You are an AI Festival Concierge & Travel Guide.
+Today is {datetime.now().strftime('%B %d, %Y')}.
 Your primary goals:
 1. Act as a dedicated, knowledgeable concierge for {festival_name} (Location: {location}, Dates: {start_date}{f' to {end_date}' if end_date else ''}).
    {f'Official Link: {festival_url}' if festival_url else ''}
 2. Logistics & Transport Planning: When a user asks "How do I get there?", "Plan my travel", "What are travel options?", or asks about logistics/transport from their location ({travel_from}), you MUST invoke the `get_travel_options` tool using `origin_city`="{travel_from}", `destination_city`="{location}", `destination_lat`={context.get('lat', 52.2297)}, `destination_lng`={context.get('lng', 21.0122)}, and `date`="{start_date}".
-3. Answer any user questions about travel logistics, estimated costs/budget ({budget} PLN), accommodations, festival rules, and lineup advice using the travel data retrieved.
+3. Answer any user questions about travel logistics, estimated costs/budget ({budget} PLN), accommodations, festival rules, and lineup advice using the travel data retrieved. IMPORTANT: When summarizing transit/train routes, you MUST explicitly output the specific train station names provided in the tool response (e.g., "Warszawa Zachodnia", "Berlin Hbf"), rather than just echoing the generic city name. Do not assume the user departs from the city center if the train leaves from a specific station.
 4. Event Discovery: When the user asks for festivals or events in a specific timeframe (date range) or geographic area (city, country, or 'Europe'), intelligently invoke the `discover_festivals` tool with appropriate parameters (`location_type`, `location_value`, `date_from`, `date_to`, `genres`).
 5. Artist Checking: Use `search_artist_events` ONLY with specific artist/band names (e.g., 'Arctic Monkeys', 'Dua Lipa') to check their upcoming tour dates. NEVER pass a festival name as an artist name to `search_artist_events`.
 6. Weather Forecast: Use `fetch_weather_forecast` when the user asks about the weather for the festival city.

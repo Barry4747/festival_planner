@@ -36,5 +36,22 @@
   },
   "footer": {
     "copyright": "© 2026 Festival Planner AI"
+  },
+  "tabs": {
+    "logistics": "Logistyka",
+    "chat": "Czat",
+    "details": "Szczegóły",
+    "weather": "Pogoda"
+  },
+  "weather": {
+    "title": "Prognoza 5-dniowa",
+    "layerRain": "Mapa opadów",
+    "layerTemp": "Temperatura",
+    "layerWind": "Wiatr",
+    "layerClouds": "Zachmurzenie",
+    "layerNone": "Brak filtru",
+    "noData": "Brak prognozy. Zapytaj Asystenta AI o pogodę dla tego wydarzenia.",
+    "view5Days": "5 Dni",
+    "view24h": "24 Godziny"
   }
 }

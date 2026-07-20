@@ -16,11 +16,15 @@ async def lifespan(app: FastAPI):
     init_db()
     yield
 
+from app.core.rate_limit import RateLimitException, rate_limit_exception_handler
+
 app = FastAPI(
     title="Festival Planner API",
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.add_exception_handler(RateLimitException, rate_limit_exception_handler)
 
 # Konfiguracja CORS pod frontend (Vite)
 app.add_middleware(

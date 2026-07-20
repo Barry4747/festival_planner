@@ -3,7 +3,7 @@ from .festival_sources import BaseFestivalSource, TicketmasterSource, SupabaseSo
 from .suggestion_service import FestivalSuggestionService
 from .discovery_service import FestivalDiscoveryService
 from .concierge_service import FestivalConciergeService
-from .transport import get_car_route, get_train_routes, geocode_city, reverse_geocode_coords
+from .transport import get_car_route, get_google_directions, geocode_city, reverse_geocode_coords
 
 __all__ = [
     "FestivalAggregator",
@@ -15,7 +15,7 @@ __all__ = [
     "FestivalDiscoveryService",
     "FestivalConciergeService",
     "get_car_route",
-    "get_train_routes",
+    "get_google_directions",
     "geocode_city",
     "reverse_geocode_coords",
 ]

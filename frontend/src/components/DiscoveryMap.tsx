@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, CircleMarker,
 import L from 'leaflet';
 import { api } from '../lib/axios';
 import {
-  MapPin,
+
   Calendar,
   Sliders,
   Loader2,
@@ -14,6 +14,7 @@ import {
   Bookmark,
   BookmarkCheck,
 } from 'lucide-react';
+import { usePlannerStore } from '../store/usePlannerStore';
 
 // Ensure default icon compatibility with Vite
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
@@ -34,7 +35,7 @@ const createFestivalIcon = (isSelected: boolean) => {
     ? 'bg-emerald-400 text-black border-white shadow-emerald-500/60 scale-110 z-50'
     : 'bg-[#111412] text-emerald-400 border-emerald-500/60 shadow-black/80 hover:scale-105';
   return L.divIcon({
-    className: 'festival-marker-icon',
+    className: 'bg-transparent border-none',
     html: `<div class="flex h-8 w-8 items-center justify-center rounded-full border-2 ${borderBg} shadow-lg transition-all">
       <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
     </div>`,
@@ -45,7 +46,7 @@ const createFestivalIcon = (isSelected: boolean) => {
 };
 
 const OriginPinIcon = L.divIcon({
-  className: 'origin-pin-marker',
+  className: 'bg-transparent border-none',
   html: `<div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;position:relative">
     <div style="position:absolute;width:30px;height:30px;border-radius:50%;background:rgba(59,130,246,0.15);animation:pulse 1.8s ease-in-out infinite"></div>
     <div style="position:relative;width:20px;height:20px;border-radius:50%;background:#3b82f6;border:2px solid #fff;display:flex;align-items:center;justify-content:center">
@@ -57,7 +58,7 @@ const OriginPinIcon = L.divIcon({
 });
 
 const CenterPinIcon = L.divIcon({
-  className: 'center-pin-marker',
+  className: 'bg-transparent border-none',
   html: `<div class="relative flex h-8 w-8 items-center justify-center">
     <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40"></span>
     <div class="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-500 shadow-md">
@@ -87,50 +88,56 @@ const MapRecenter: React.FC<{ center: [number, number] }> = ({ center }) => {
   return null;
 };
 
-// Route bounding controller when routeCoordinates or transportData change
+// Route bounding controller when activeRouteSteps or transportData change
 const RouteFitter: React.FC<{
-  routeCoordinates?: [number, number][] | null;
+  activeRouteSteps?: RouteStep[] | null;
   transportData?: TransportRoutesData | null;
   activeTransportMode?: 'car' | 'train';
   selectedTrainIndex?: number;
-}> = ({ routeCoordinates, transportData, activeTransportMode, selectedTrainIndex = 0 }) => {
+}> = ({ activeRouteSteps, transportData, activeTransportMode, selectedTrainIndex = 0 }) => {
   const map = useMap();
   useEffect(() => {
     try {
+      if (activeRouteSteps && activeRouteSteps.length > 0) {
+        const allCoords = activeRouteSteps.flatMap(step => step.polyline);
+        if (allCoords.length > 0) {
+          map.fitBounds(allCoords, { padding: [50, 50] });
+          return;
+        }
+      }
       if (transportData) {
         if (activeTransportMode === 'car' && transportData.car?.geometry?.length > 0) {
           map.fitBounds(transportData.car.geometry, { padding: [60, 60] });
           return;
-        } else if (activeTransportMode === 'train' && transportData.train) {
-          const activeJourney = transportData.train.itineraries[selectedTrainIndex] || transportData.train.itineraries[0];
-          if (activeJourney?.path_coordinates && activeJourney.path_coordinates.length > 0) {
-            map.fitBounds(activeJourney.path_coordinates, { padding: [60, 60] });
-            return;
-          }
-          const pts: [number, number][] = [];
-          if (transportData.train.origin_coords) pts.push(transportData.train.origin_coords);
-          if (transportData.train.dest_coords) pts.push(transportData.train.dest_coords);
-          if (pts.length > 0) {
-            map.fitBounds(pts, { padding: [60, 60] });
+        } else if (activeTransportMode === 'train' && transportData.train?.steps && transportData.train.steps.length > 0) {
+          const allCoords = transportData.train.steps.flatMap(step => step.polyline);
+          if (allCoords.length > 0) {
+            map.fitBounds(allCoords, { padding: [60, 60] });
             return;
           }
         }
       }
-      if (routeCoordinates && routeCoordinates.length > 0) {
-        map.fitBounds(routeCoordinates, { padding: [50, 50] });
-      }
     } catch (e) {
       console.error("RouteFitter fitBounds error:", e);
     }
-  }, [routeCoordinates, transportData, activeTransportMode, selectedTrainIndex, map]);
+  }, [activeRouteSteps, transportData, activeTransportMode, selectedTrainIndex, map]);
   return null;
 };
 
 import type { Festival } from '../types';
 import { SuggestFestivalModal } from './SuggestFestivalModal';
-import type { TransportRoutesData } from './LogisticsPanel';
+import type { TransportRoutesData, RouteStep } from './LogisticsPanel';
 
 export type FestivalItem = Festival;
+
+const TrainStationPinIcon = new L.DivIcon({
+  html: `<div style="background-color: #3b82f6; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.5); border: 2px solid #ffffff;">
+           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="16" rx="2" ry="2"></rect><path d="M4 11h16"></path><path d="M12 3v8"></path><path d="M8 19l-2 3"></path><path d="M18 22l-2-3"></path><path d="M8 15h0"></path><path d="M16 15h0"></path></svg>
+         </div>`,
+  className: '',
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
+});
 
 interface DiscoveryMapProps {
   selectedFestival: FestivalItem | null;
@@ -173,8 +180,49 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
   const [festivals, setFestivals] = useState<FestivalItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-
   const debounceTimer = useRef<any>(null);
+
+  const activeTab = usePlannerStore((state) => state.activeTab);
+  const weatherLayer = usePlannerStore((state) => state.weatherLayer);
+  const setWeatherLayer = usePlannerStore((state) => state.setWeatherLayer);
+  const routeData = usePlannerStore((state) => state.routeData);
+  const activeRouteSteps = usePlannerStore((state) => state.activeRouteSteps);
+
+  const [currentWeatherPoints, setCurrentWeatherPoints] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (activeTab !== 'weather') {
+      setCurrentWeatherPoints([]);
+      return;
+    }
+    
+    let isMounted = true;
+    const fetchPoints = async () => {
+      const points = [];
+      if (originCoords) {
+        try {
+          const res = await api.get(`/api/weather/current?lat=${originCoords[0]}&lon=${originCoords[1]}`);
+          if (!res.data.error) points.push({ ...res.data, label: 'Origin' });
+        } catch(e) {}
+      }
+      
+      const destCoords = selectedFestival ? [selectedFestival.lat, selectedFestival.lng] : [pin.lat, pin.lng];
+      try {
+        const res = await api.get(`/api/weather/current?lat=${destCoords[0]}&lon=${destCoords[1]}`);
+        if (!res.data.error) points.push({ ...res.data, label: selectedFestival ? selectedFestival.name : 'Destination' });
+      } catch(e) {}
+      
+      if (isMounted) {
+        // Filter out duplicates if origin and destination are the same/very close
+        const uniquePoints = points.filter((p, i, self) => 
+          i === self.findIndex((t) => Math.abs(t.lat - p.lat) < 0.1 && Math.abs(t.lon - p.lon) < 0.1)
+        );
+        setCurrentWeatherPoints(uniquePoints);
+      }
+    };
+    fetchPoints();
+    return () => { isMounted = false; };
+  }, [activeTab, originCoords, selectedFestival, pin.lat, pin.lng]);
 
   const handleToggle = async (e: React.MouseEvent, festival: FestivalItem) => {
     e.stopPropagation();
@@ -234,22 +282,7 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', backgroundColor: '#1E1E1E' }}>
       {/* ── CONTROL PANEL ── */}
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #2D2D2D', backgroundColor: '#1E1E1E', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {/* Header row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <MapPin size={13} style={{ color: '#10B981' }} />
-            <span style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#EDEDED' }}>
-              Discovery Map
-            </span>
-            <span style={{ fontSize: '0.65rem', color: '#A1A1AA', fontFamily: 'monospace' }}>
-              {pin.lat.toFixed(3)}, {pin.lng.toFixed(3)}
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {loading && <Loader2 size={12} style={{ color: '#10B981', animation: 'spin 0.8s linear infinite' }} />}
-          </div>
-        </div>
-
+        {/* Loading indicator moved to controls row or hidden since it's a small detail, let's put it next to radius if needed, or just keep it simple */}
         {/* Controls row: dates + radius */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           {/* Start Date */}
@@ -331,10 +364,42 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
           zoom={6}
           className="h-full w-full z-0"
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              className={activeTab === 'weather' ? 'brightness-[0.3] grayscale contrast-125' : ''}
+            />
+          {activeTab === 'weather' && weatherLayer !== 'none' && (
+            <TileLayer
+              key={weatherLayer}
+              attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
+              url={`https://tile.openweathermap.org/map/${weatherLayer}/{z}/{x}/{y}.png?appid=${import.meta.env.VITE_OPENWEATHER_API_KEY}`}
+              opacity={1}
+              className="saturate-200 contrast-150 drop-shadow-md"
+              zIndex={5}
+            />
+          )}
+
+          {/* Concrete Weather Data Points */}
+          {activeTab === 'weather' && currentWeatherPoints.map((point, idx) => (
+            <Marker
+              key={`weather-pt-${idx}`}
+              position={[point.lat, point.lon]}
+              icon={L.divIcon({
+                className: 'bg-transparent border-none',
+                html: `<div class="flex items-center gap-2 px-2 py-1.5 bg-[#18181b] border border-[#27272a] rounded-md shadow-xl pointer-events-none whitespace-nowrap overflow-hidden max-w-[220px]">
+                         <span class="text-[10px] text-zinc-400 font-medium uppercase truncate max-w-[80px]" title="${point.label}">${point.label}</span>
+                         <span class="text-sm font-bold text-white shrink-0">${Math.round(point.temp)}°C</span>
+                         <div class="flex items-center gap-1 text-[11px] text-zinc-300 border-l border-[#27272a] pl-2 ml-1 shrink-0">
+                           <svg style="transform: rotate(${point.wind_deg}deg);" class="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+                           <span>${Math.round(point.wind_speed)} km/h</span>
+                         </div>
+                       </div>`,
+                iconSize: [220, 36],
+                iconAnchor: [110, 70] // Shifted significantly up to not overlap with festival pin
+              })}
+            />
+          ))}
 
           {/* Listen for map clicks to move pin */}
           <MapClickHandler onPinChange={handlePinChange} />
@@ -344,7 +409,7 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
 
           {/* Render route polyline and fit bounds if travel route or transport data exists */}
           <RouteFitter
-            routeCoordinates={routeCoordinates}
+            activeRouteSteps={activeRouteSteps}
             transportData={transportData}
             activeTransportMode={activeTransportMode}
             selectedTrainIndex={selectedTrainIndex}
@@ -355,61 +420,82 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
             <Polyline positions={transportData.car.geometry} color="#3b82f6" weight={5} opacity={0.85} />
           )}
 
-          {/* Train Route & Stations from Logistics Panel */}
-          {transportData && activeTransportMode === 'train' && transportData.train && (() => {
-            const activeJourney = transportData.train.itineraries[selectedTrainIndex] || transportData.train.itineraries[0];
-            if (!activeJourney) return null;
+          {/* Multi-step Train Route Render Engine */}
+          {(() => {
+            const stepsToRender = activeRouteSteps || (activeTransportMode === 'train' && transportData?.train?.steps ? transportData.train.steps : null);
+            if (!stepsToRender || stepsToRender.length === 0) return null;
 
-            const pathCoords = activeJourney.path_coordinates && activeJourney.path_coordinates.length > 0
-              ? activeJourney.path_coordinates
-              : [transportData.train.origin_coords, transportData.train.dest_coords].filter(Boolean);
+            return stepsToRender.map((step, idx) => {
+              // Calculate midpoint of polyline for the duration label
+              const midIndex = Math.floor(step.polyline.length / 2);
+              const midPoint = step.polyline[midIndex];
 
-            const legs = activeJourney.legs || [];
-
-            return (
-              <React.Fragment key={`train-route-${selectedTrainIndex}`}>
-                <Polyline positions={pathCoords} color="#ef4444" weight={4} dashArray="6, 10" opacity={0.85} />
-
-                {legs.map((leg, legIdx) => {
-                  const isFirst = legIdx === 0;
-                  const isLast = legIdx === legs.length - 1;
-
-                  return (
-                    <React.Fragment key={`leg-${legIdx}`}>
-                      <CircleMarker
-                        center={[leg.origin.lat, leg.origin.lng]}
-                        radius={isFirst ? 8 : 7}
-                        pathOptions={{ color: '#ffffff', fillColor: isFirst ? '#3b82f6' : '#f59e0b', fillOpacity: 1, weight: 2 }}
-                      >
-                        <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
-                          <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', fontWeight: 600, color: '#121212' }}>
-                            {isFirst ? 'Departure: ' : 'Transfer: '} {leg.origin.name} ({leg.departure})
-                          </span>
-                        </Tooltip>
-                      </CircleMarker>
-
-                      {isLast && (
-                        <CircleMarker
-                          center={[leg.destination.lat, leg.destination.lng]}
-                          radius={8}
-                          pathOptions={{ color: '#ffffff', fillColor: '#10b981', fillOpacity: 1, weight: 2 }}
-                        >
-                          <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', fontWeight: 600, color: '#121212' }}>
-                              Arrival: {leg.destination.name} ({leg.arrival})
-                            </span>
-                          </Tooltip>
-                        </CircleMarker>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </React.Fragment>
-            );
+              if (step.mode === 'WALKING') {
+                return (
+                  <React.Fragment key={`step-${idx}`}>
+                    <Polyline 
+                      positions={step.polyline} 
+                      pathOptions={{ color: '#9ca3af', weight: 4, dashArray: '5, 10' }} 
+                    />
+                    {midPoint && (
+                      <Marker 
+                        position={midPoint} 
+                        icon={L.divIcon({
+                          className: 'bg-transparent border-none',
+                          html: `<div class="px-2 py-1 bg-[#18181b] text-zinc-300 text-[10px] font-medium rounded-md border border-[#27272a] shadow-md whitespace-nowrap text-center">${step.duration}</div>`,
+                          iconSize: [80, 24],
+                          iconAnchor: [40, 12]
+                        })} 
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              }
+              return (
+                <React.Fragment key={`step-${idx}`}>
+                  <Polyline 
+                    positions={step.polyline} 
+                    pathOptions={{ color: step.color || '#3b82f6', weight: 5 }} 
+                  />
+                  {step.start_location && (
+                    <>
+                      <CircleMarker 
+                        center={step.start_location} 
+                        radius={4} 
+                        pathOptions={{ color: '#ffffff', fillColor: step.color || '#3b82f6', fillOpacity: 1, weight: 2 }}
+                      />
+                      <Marker 
+                        position={step.start_location}
+                        icon={L.divIcon({
+                          className: 'bg-transparent border-none',
+                          html: `<div class="flex flex-col bg-[#18181b] border border-[#27272a] rounded-lg shadow-lg p-2 whitespace-nowrap pointer-events-none">
+                                   <span class="text-xs font-semibold text-zinc-100">${step.departure_stop || 'Transit Stop'}</span>
+                                   <span class="text-[10px] text-zinc-400">Departs: ${step.departure_time}</span>
+                                 </div>`,
+                          iconSize: [140, 50],
+                          iconAnchor: [70, 60]
+                        })}
+                      />
+                    </>
+                  )}
+                  {midPoint && (
+                    <Marker 
+                      position={midPoint} 
+                      icon={L.divIcon({
+                        className: 'bg-transparent border-none',
+                        html: `<div class="px-2 py-1 bg-[#18181b] text-zinc-300 text-[10px] font-medium rounded-md border border-[#27272a] shadow-md whitespace-nowrap text-center">${step.duration}</div>`,
+                        iconSize: [80, 24],
+                        iconAnchor: [40, 12]
+                      })} 
+                    />
+                  )}
+                </React.Fragment>
+              );
+            });
           })()}
 
           {/* Fallback AI Chat Polyline when no explicit Logistics Panel data is active */}
-          {!transportData && routeCoordinates && routeCoordinates.length > 0 && (
+          {!transportData && !activeRouteSteps && routeCoordinates && routeCoordinates.length > 0 && (
             <Polyline positions={routeCoordinates} color="#3b82f6" weight={5} opacity={0.7} />
           )}
 
@@ -437,7 +523,22 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
           </Marker>
           {/* Origin City Pin (from Logistics panel) */}
           {originCoords && (
-            <Marker position={originCoords} icon={OriginPinIcon}>
+            activeTransportMode === 'train' && routeData.departureStationCoords && 
+            (originCoords[0] !== routeData.departureStationCoords[0] || originCoords[1] !== routeData.departureStationCoords[1])
+          ) ? (
+            <CircleMarker
+              center={originCoords as [number, number]}
+              radius={6}
+              pathOptions={{ color: '#ffffff', fillColor: '#10b981', fillOpacity: 1, weight: 2 }}
+            >
+              <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
+                <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', fontWeight: 600, color: '#121212' }}>
+                  Your Origin: {routeData.originName || 'Current Location'}
+                </span>
+              </Tooltip>
+            </CircleMarker>
+          ) : originCoords ? (
+            <Marker position={originCoords as [number, number]} icon={OriginPinIcon}>
               <Popup>
                 <div style={{ fontFamily: 'Inter, sans-serif', padding: '4px' }}>
                   <p style={{ fontSize: '11px', fontWeight: 700, color: '#121212', margin: '0 0 2px' }}>Origin / Start City</p>
@@ -445,7 +546,7 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
                 </div>
               </Popup>
             </Marker>
-          )}
+          ) : null}
 
           {/* Discovered Festival Markers */}
           {festivals.map((festival) => {
@@ -534,7 +635,8 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
         </MapContainer>
 
         {/* Floating suggest button */}
-        <div style={{ position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000 }}>
+        <div style={{ position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+          
           <button
             onClick={() => onOpenSuggestModal ? onOpenSuggestModal() : setIsSuggestModalOpen(true)}
             style={{

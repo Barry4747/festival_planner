@@ -37,12 +37,15 @@ async def get_chat_history(
     )
 
 
+from app.core.rate_limit import check_rate_limit
+
 @router.post("")
 @router.post("/")
 async def chat_endpoint(
     request: ChatRequest,
     user: Dict[str, Any] = Depends(get_current_user),
     service: FestivalConciergeService = Depends(get_concierge_service),
+    _rate_limit: dict = Depends(check_rate_limit("ai_agent"))
 ) -> Dict[str, Any]:
     """
     Entity-Bound Generative AI Chatbot Concierge endpoint. Requires JWT authentication.

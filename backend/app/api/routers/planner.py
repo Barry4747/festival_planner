@@ -11,8 +11,30 @@ from app.services import (
     FestivalDiscoveryService,
     FestivalConciergeService,
 )
+from app.services.weather import fetch_weather
 
 router = APIRouter()
+
+from app.core.rate_limit import check_rate_limit
+
+@router.get("/weather")
+async def get_weather(
+    city: str, 
+    date: Optional[str] = None,
+    _rate_limit: dict = Depends(check_rate_limit("weather"))
+):
+    """Directly fetch weather forecast for a city."""
+    return await fetch_weather(city=city, date=date)
+
+@router.get("/weather/current")
+async def get_current_weather(
+    lat: float, 
+    lon: float,
+    _rate_limit: dict = Depends(check_rate_limit("weather"))
+):
+    """Fetch current weather by coordinates."""
+    from app.services.weather import fetch_current_weather
+    return await fetch_current_weather(lat=lat, lon=lon)
 
 
 class ChatRequest(BaseModel):
@@ -65,6 +87,7 @@ async def get_festivals_map(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     service: FestivalDiscoveryService = Depends(get_discovery_service),
+    _rate_limit: dict = Depends(check_rate_limit("ticketmaster"))
 ) -> List[Dict[str, Any]]:
     """
     Direct map discovery endpoint. Delegates to FestivalDiscoveryService (Aggregator Pattern)
@@ -80,6 +103,7 @@ async def plan_trip(
     trip_details: TripDetailsModel,
     user_preferences: UserPreferencesModel,
     service: FestivalConciergeService = Depends(get_concierge_service),
+    _rate_limit: dict = Depends(check_rate_limit("ai_agent"))
 ):
     """
     Legacy plan-trip endpoint kept for backwards compatibility with existing frontend form.

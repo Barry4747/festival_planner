@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { api } from '../lib/axios';
 import { LocationAutocomplete } from './LocationAutocomplete';
-import { WeatherWidget } from './WeatherWidget';
 import type { FestivalItem } from './DiscoveryMap';
-import { Car, Train, Navigation, Loader2, MapPin, Clock, Fuel, ArrowRight, Check } from 'lucide-react';
+import { Car, Train, Navigation, Loader2, MapPin, Clock, Fuel, ArrowRight, Check, LocateFixed } from 'lucide-react';
 import { usePlannerStore } from '../store/usePlannerStore';
+import { useGeolocation } from '../utils/useGeolocation';
 
 export interface TrainLeg {
   origin: { name: string; lat: number; lng: number };
@@ -14,15 +14,18 @@ export interface TrainLeg {
   arrival: string;
 }
 
-export interface TrainItinerary {
-  departure_time: string;
-  arrival_time: string;
+export interface RouteStep {
+  mode: string;
   duration: string;
-  transfers: number;
-  provider?: string;
-  connection_type?: string;
-  legs?: TrainLeg[];
-  path_coordinates?: [number, number][];
+  instruction?: string;
+  polyline: [number, number][];
+  line_name?: string;
+  color?: string;
+  departure_stop?: string;
+  departure_time?: string;
+  arrival_stop?: string;
+  arrival_time?: string;
+  start_location?: [number, number];
 }
 
 export interface TransportRoutesData {
@@ -37,11 +40,12 @@ export interface TransportRoutesData {
     status: string;
   };
   train: {
-    itineraries: TrainItinerary[];
-    origin_coords: [number, number];
-    dest_coords: [number, number];
-    origin_name?: string;
-    dest_name?: string;
+    total_duration?: string;
+    distance?: string;
+    route_coordinates?: [number, number][];
+    steps?: RouteStep[];
+    status?: string;
+    message?: string;
   };
 }
 
@@ -77,6 +81,8 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { locateUser, isLocating, error: geoError } = useGeolocation();
+
   const handleGetDirections = async () => {
     if (!selectedFestival || !originCity.trim()) {
       setError('Please enter your starting city.');
@@ -91,13 +97,14 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
           dest_lat: selectedFestival.lat,
           dest_lng: selectedFestival.lng,
           date: selectedFestival.start_date || selectedFestival.dates || '2026-07-20',
-          dest_name: selectedFestival.name,
+          dest_name: selectedFestival.city || selectedFestival.name.split('|')[0].replace('Festival', '').strip(),
         },
       });
       if (response.data) {
         setRouteData({ coordinates: null, transportData: response.data });
         onActiveTransportModeChange('car');
         onSelectedTrainIndexChange(0);
+        usePlannerStore.getState().syncMultiLegData();
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || 'Failed to calculate routes.');
@@ -128,12 +135,34 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
           <MapPin size={11} /> Starting City
         </label>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, position: 'relative' }}>
             <LocationAutocomplete
               value={originCity}
               onChange={onOriginCityChange}
               placeholder="e.g. Warsaw, Berlin, Prague..."
             />
+            <button
+              onClick={locateUser}
+              disabled={isLocating}
+              title="Locate Me"
+              style={{
+                position: 'absolute',
+                right: '4px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: isLocating ? '#10B981' : '#A1A1AA',
+                cursor: isLocating ? 'not-allowed' : 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              className="hover:text-white transition-colors"
+            >
+              {isLocating ? <Loader2 size={16} className="animate-spin" /> : <LocateFixed size={16} />}
+            </button>
           </div>
           <button
             onClick={handleGetDirections}
@@ -166,10 +195,10 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
         {error && (
           <p style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '6px' }}>{error}</p>
         )}
+        {geoError && (
+          <p style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '6px' }}>{geoError}</p>
+        )}
       </div>
-
-      <WeatherWidget />
-
       {/* Mode toggles */}
       {transportData && (
         <>
@@ -220,84 +249,73 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
           {/* Train results */}
           {activeTransportMode === 'train' && transportData.train && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '320px', overflowY: 'auto' }} className="no-scrollbar">
-              {transportData.train.itineraries.length === 0 ? (
+              
+              {transportData.train.message && (
+                <div style={{ padding: '8px 12px', backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '2px', display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '4px' }}>
+                  <Navigation size={14} style={{ color: '#3b82f6', flexShrink: 0, marginTop: '2px' }} />
+                  <p style={{ fontSize: '0.65rem', color: '#93c5fd', lineHeight: 1.5, margin: 0 }}>
+                    {transportData.train.message}
+                  </p>
+                </div>
+              )}
+
+              {transportData.train.status !== 'success' && (!transportData.train.steps || transportData.train.steps.length === 0) ? (
                 <p style={{ fontSize: '0.75rem', color: '#A1A1AA', textAlign: 'center', padding: '24px 0' }}>
-                  No train itineraries found for this route.
+                  No transit routes found for this journey.
                 </p>
               ) : (
-                transportData.train.itineraries.map((itinerary, idx) => {
-                  const isSelected = selectedTrainIndex === idx;
-                  const legsChain = itinerary.legs && itinerary.legs.length > 0
-                    ? [itinerary.legs[0].origin.name, ...itinerary.legs.map(l => l.destination.name)].join(' → ')
-                    : null;
+                <div
+                  style={{
+                    backgroundColor: '#1E1E1E',
+                    border: '1px solid rgba(59, 130, 246, 0.5)',
+                    padding: '12px',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#EDEDED' }}>
+                        {transportData.train.total_duration}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: '#A1A1AA' }}>
+                        {transportData.train.distance}
+                      </span>
+                    </div>
+                  </div>
 
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => onSelectedTrainIndexChange(idx)}
-                      style={{
-                        padding: '12px 14px',
-                        border: `1px solid ${isSelected ? '#10B981' : '#2D2D2D'}`,
-                        borderRadius: '2px',
-                        cursor: 'pointer',
-                        backgroundColor: isSelected ? '#1A2E25' : 'transparent',
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      {/* Times row */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 600, color: '#10B981' }}>
-                          <span>{itinerary.departure_time.split(' ')[1] || itinerary.departure_time}</span>
-                          <ArrowRight size={12} style={{ color: '#A1A1AA' }} />
-                          <span>{itinerary.arrival_time.split(' ')[1] || itinerary.arrival_time}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          {isSelected && <Check size={12} style={{ color: '#10B981' }} />}
-                          <span style={{
-                            fontSize: '0.65rem',
-                            fontWeight: 600,
-                            color: '#10B981',
-                            backgroundColor: '#1A2E25',
-                            border: '1px solid #2D5A3D',
-                            padding: '2px 6px',
-                            borderRadius: '2px',
-                          }}>{itinerary.duration}</span>
-                        </div>
-                      </div>
-
-                      {/* Provider / transfers */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.7rem', color: '#A1A1AA', marginBottom: legsChain ? '8px' : 0 }}>
-                        <span>{itinerary.provider || 'PKP / DB'}</span>
-                        <span style={{ color: itinerary.transfers === 0 ? '#10B981' : '#A1A1AA' }}>
-                          {itinerary.transfers === 0 ? 'Direct' : `${itinerary.transfers} transfer${itinerary.transfers > 1 ? 's' : ''}`}
-                        </span>
-                      </div>
-
-                      {/* Leg chain */}
-                      {legsChain && (
-                        <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#121212', border: '1px solid #2D2D2D', borderRadius: '2px' }}>
-                          <p style={{ fontSize: '0.6rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#A1A1AA', marginBottom: '4px' }}>Route</p>
-                          <p style={{ fontSize: '0.7rem', color: '#EDEDED', fontFamily: 'monospace', lineHeight: 1.5, wordBreak: 'break-word' }}>{legsChain}</p>
-
-                          {itinerary.legs && itinerary.legs.length > 1 && isSelected && (
-                            <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #2D2D2D', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {itinerary.legs.map((leg, legIdx) => (
-                                <div key={legIdx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#A1A1AA' }}>
-                                  <span>
-                                    <strong style={{ color: '#EDEDED' }}>{leg.departure}</strong> {leg.origin.name}
-                                    {' → '}
-                                    <strong style={{ color: '#EDEDED' }}>{leg.arrival}</strong> {leg.destination.name}
-                                  </span>
-                                  <span style={{ color: '#10B981', marginLeft: '8px', flexShrink: 0 }}>{leg.train_name}</span>
-                                </div>
-                              ))}
-                            </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
+                    {transportData.train.steps?.map((step, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '12px', flexShrink: 0 }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: step.color || (step.mode === 'WALKING' ? '#6b7280' : '#ef4444'), marginTop: '4px', zIndex: 1 }} />
+                          {idx < (transportData.train.steps!.length - 1) && (
+                            <div style={{ width: '2px', flex: 1, backgroundColor: step.color || (step.mode === 'WALKING' ? '#6b7280' : '#ef4444'), opacity: 0.5, marginTop: '2px', marginBottom: '2px' }} />
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: idx < (transportData.train.steps!.length - 1) ? '16px' : '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: step.color || (step.mode === 'WALKING' ? '#9ca3af' : '#EDEDED') }}>
+                              {step.mode === 'WALKING' ? 'Walk' : step.line_name}
+                            </span>
+                            <span style={{ fontSize: '0.65rem', color: '#A1A1AA', fontWeight: 500 }}>{step.duration}</span>
+                          </div>
+                          {step.mode !== 'WALKING' && step.departure_stop && (
+                            <div style={{ fontSize: '0.65rem', color: '#A1A1AA', lineHeight: 1.4, marginTop: '2px' }}>
+                              <div><strong style={{color: '#D4D4D8'}}>{step.departure_time}</strong> {step.departure_stop}</div>
+                              {step.arrival_stop && <div><strong style={{color: '#D4D4D8'}}>{step.arrival_time}</strong> {step.arrival_stop}</div>}
+                            </div>
+                          )}
+                          {step.mode === 'WALKING' && step.instruction && (
+                            <span style={{ fontSize: '0.65rem', color: '#A1A1AA', marginTop: '2px' }} dangerouslySetInnerHTML={{ __html: step.instruction }} />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
