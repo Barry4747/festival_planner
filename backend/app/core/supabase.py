@@ -1,9 +1,12 @@
 from typing import Optional, Dict, Any
 import json
+import logging
 import urllib.parse
 from fastapi import Header, HTTPException, status, Depends, Request
 from supabase import Client
 from app.db.database import get_supabase_client as get_supabase
+
+logger = logging.getLogger(__name__)
 
 
 async def get_current_user(
@@ -76,8 +79,10 @@ async def get_current_user(
     except HTTPException:
         raise
     except Exception as e:
+        # Log the real error internally; never expose internal details to the client.
+        logger.error("Token verification error: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Błąd weryfikacji tokenu w Supabase: {str(e)}",
+            detail="Authentication failed.",
             headers={"WWW-Authenticate": "Bearer"},
         )

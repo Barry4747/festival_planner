@@ -1,15 +1,15 @@
 TIER_CONFIG = {
-    "BEFOREK": {
-        "name": "Beforek",
+    "FREE": {
+        "name": "Free",
         "limits": {
-            "ai_agent": {"rpm": 3, "rpd": 5},
+            "ai_agent": {"rpm": 0, "rpd": 5},
             "google_maps": {"rpm": 10, "rpd": 20},
             "ticketmaster": {"rpm": 15, "rpd": 30},
             "weather": {"rpm": 10, "rpd": 30}
         }
     },
-    "RAVER": {
-        "name": "Raver",
+    "BASIC": {
+        "name": "Basic",
         "limits": {
             "ai_agent": {"rpm": 10, "rpd": 50},
             "google_maps": {"rpm": 30, "rpd": 150},
@@ -17,8 +17,8 @@ TIER_CONFIG = {
             "weather": {"rpm": 30, "rpd": 150}
         }
     },
-    "MAINSTAGE_VIP": {
-        "name": "Mainstage VIP",
+    "PRO": {
+        "name": "Pro",
         "limits": {
             "ai_agent": {"rpm": 60, "rpd": 500},
             "google_maps": {"rpm": 100, "rpd": 1000},

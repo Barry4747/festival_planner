@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { Mail, Lock, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { useTranslation } from 'react-i18next';
 
 interface AuthSectionProps {
   initialMode?: 'signin' | 'signup';
@@ -22,6 +23,7 @@ export const AuthSection: React.FC<AuthSectionProps> = ({
   initialMode = 'signup',
   onSuccess,
 }) => {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,7 +50,7 @@ export const AuthSection: React.FC<AuthSectionProps> = ({
       if (mode === 'signup') {
         const { error: err } = await supabase.auth.signUp({ email, password });
         if (err) throw err;
-        setSuccess('Account created! Check your inbox to confirm your email.');
+        setSuccess(t('auth.successSignup'));
         setMode('signin');
       } else {
         const { error: err } = await supabase.auth.signInWithPassword({ email, password });
@@ -56,7 +58,7 @@ export const AuthSection: React.FC<AuthSectionProps> = ({
         onSuccess?.();
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred. Please try again.');
+      setError(err.message || t('auth.errorGeneric'));
     } finally {
       setLoading(false);
     }
@@ -72,7 +74,7 @@ export const AuthSection: React.FC<AuthSectionProps> = ({
       });
       if (err) throw err;
     } catch (err: any) {
-      setError(err.message || 'Google sign-in failed. Please try again.');
+      setError(err.message || t('auth.errorGoogle'));
       setGoogleLoading(false);
     }
   };
@@ -80,97 +82,98 @@ export const AuthSection: React.FC<AuthSectionProps> = ({
   return (
     <div className="w-full">
       {/* Mode toggle */}
-      <div className="mb-6 flex rounded-lg border border-white/10 bg-[#111412] p-1">
+      <div className="mb-6 flex bg-zinc-900 border border-zinc-800 p-1 rounded-lg">
         <button
           type="button"
           onClick={() => { setMode('signup'); setError(null); setSuccess(null); }}
-          className={`flex-1 rounded-md py-2 text-xs font-medium transition-colors ${
+          className={`flex-1 py-2 text-sm font-medium transition-all duration-200 rounded-md ${
             mode === 'signup'
-              ? 'bg-emerald-600 text-white font-semibold'
-              : 'text-slate-400 hover:text-white'
+              ? 'bg-zinc-800 text-white shadow'
+              : 'text-zinc-400 hover:text-zinc-200'
           }`}
         >
-          Create Account
+          {t('auth.signup')}
         </button>
         <button
           type="button"
           onClick={() => { setMode('signin'); setError(null); setSuccess(null); }}
-          className={`flex-1 rounded-md py-2 text-xs font-medium transition-colors ${
+          className={`flex-1 py-2 text-sm font-medium transition-all duration-200 rounded-md ${
             mode === 'signin'
-              ? 'bg-emerald-600 text-white font-semibold'
-              : 'text-slate-400 hover:text-white'
+              ? 'bg-zinc-800 text-white shadow'
+              : 'text-zinc-400 hover:text-zinc-200'
           }`}
         >
-          Sign In
+          {t('auth.signin')}
         </button>
       </div>
 
       {/* Alerts */}
       {error && (
-        <div className="mb-4 flex items-center gap-2.5 rounded-lg border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-300">
-          <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+        <div className="mb-4 flex items-center gap-2.5 bg-red-900/20 border border-red-900/50 p-3 rounded-lg text-sm text-red-400">
+          <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
       {success && (
-        <div className="mb-4 flex items-center gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-300">
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+        <div className="mb-4 flex items-center gap-2.5 bg-emerald-900/20 border border-emerald-900/50 p-3 rounded-lg text-sm text-emerald-400">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{success}</span>
         </div>
       )}
 
       {/* Official Google Button */}
-      <Button
+      <button
         type="button"
-        variant="google"
         onClick={handleGoogleAuth}
         disabled={googleLoading || loading}
-        className="w-full py-2.5 text-sm mb-5"
+        className="w-full py-2.5 mb-5 flex items-center justify-center gap-3 bg-zinc-900 border border-zinc-700 text-zinc-100 hover:bg-zinc-800 transition-all duration-200 rounded-lg text-sm font-medium disabled:opacity-50 shadow-sm"
       >
         <GoogleIcon />
-        <span>{googleLoading ? 'Redirecting to Google...' : 'Continue with Google'}</span>
-      </Button>
+        <span>{googleLoading ? t('auth.redirecting') : t('auth.google')}</span>
+      </button>
 
       {/* Divider */}
       <div className="my-5 flex items-center gap-3">
-        <div className="h-px flex-1 bg-white/10" />
-        <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">or email</span>
-        <div className="h-px flex-1 bg-white/10" />
+        <div className="h-px flex-1 bg-zinc-800" />
+        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">{t('auth.orEmail')}</span>
+        <div className="h-px flex-1 bg-zinc-800" />
       </div>
 
       {/* Email form */}
       <form onSubmit={handleEmailAuth} className="space-y-4">
-        <Input
-          label="Email Address"
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-          icon={<Mail className="h-4 w-4" />}
-        />
+        <div>
+          <label className="block text-sm text-zinc-400 mb-1">{t('auth.emailLabel')}</label>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={t('auth.emailPlaceholder')}
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 px-4 py-2.5 focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 outline-none transition-all placeholder:text-zinc-600 text-sm shadow-sm"
+          />
+        </div>
 
-        <Input
-          label="Password"
-          type="password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-          minLength={6}
-          icon={<Lock className="h-4 w-4" />}
-        />
+        <div>
+          <label className="block text-sm text-zinc-400 mb-1">{t('auth.passwordLabel')}</label>
+          <input
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            minLength={6}
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-100 px-4 py-2.5 focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 outline-none transition-all placeholder:text-zinc-600 text-sm shadow-sm"
+          />
+        </div>
 
-        <Button
+        <button
           type="submit"
-          variant="primary"
           disabled={loading || googleLoading}
-          className="w-full mt-2"
-          loading={loading}
+          className="w-full mt-2 py-2.5 flex items-center justify-center gap-2 bg-emerald-500 text-zinc-950 font-semibold hover:bg-emerald-400 transition-all duration-200 rounded-lg disabled:opacity-50 shadow-sm"
         >
-          <span>{mode === 'signup' ? 'Create Account' : 'Sign In'}</span>
+          <span>{mode === 'signup' ? t('auth.submitSignup') : t('auth.submitSignin')}</span>
           <ArrowRight className="h-4 w-4" />
-        </Button>
+        </button>
       </form>
     </div>
   );

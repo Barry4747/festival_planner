@@ -38,5 +38,8 @@ class FestivalSuggestionService:
                 "message": "Thank you! We will review and add this to our database.",
             }
         except Exception as e:
-            logger.error(f"❌ [FestivalSuggestionService] Failed to save suggestion: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to save suggestion: {str(e)}")
+            logger.error("Failed to save festival suggestion: %s", e, exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to save suggestion. Please try again.",
+            )

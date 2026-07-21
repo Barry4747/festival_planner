@@ -1,93 +1,60 @@
+"""LangGraph node and tool definitions for the Festival Planner AI concierge.
+
+Architecture boundary rule:
+  - This module is ONLY responsible for natural language reasoning.
+  - All deterministic data operations (geocoding, routing, festival discovery,
+    weather fetching) are delegated to service-layer functions.
+  - The LLM never computes distances, prices, or dates directly.
+
+Logging: structured logger only — no print() statements in production code.
+"""
 import asyncio
 import json
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
+
 from app.agents.state import PlannerState
 from app.api.external import TicketmasterClient
+from app.core.geo_constants import get_coords
 from app.core.llm import get_llm
+from app.services.aggregator import FestivalAggregator
+from app.services.festival_sources import SupabaseSource, TicketmasterSource
+from app.services.transport import geocode_city, get_car_route, get_google_directions
+from app.services.weather import fetch_weather
 
-logger = logging.getLogger("festival_planner.agents.lineup")
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Module-level singletons — avoid re-instantiation on every tool call
+# ---------------------------------------------------------------------------
+
+_aggregator = FestivalAggregator([TicketmasterSource(), SupabaseSource()])
+
+
+# ---------------------------------------------------------------------------
+# LangGraph Tools
+# ---------------------------------------------------------------------------
 
 
 @tool
 async def search_artist_events(artist_name: str) -> dict:
-    """Search for upcoming events and concerts for a specific artist or band using the Ticketmaster Discovery API.
+    """Search for upcoming events and concerts for a specific artist or band
+    using the Ticketmaster Discovery API.
 
     Args:
-        artist_name: The exact name of the music artist or band to search events for (e.g., 'Arctic Monkeys').
+        artist_name: The exact name of the music artist or band (e.g., 'Arctic Monkeys').
 
     Returns:
-        A dictionary containing matching events, venue, date, location, and ticket information from Ticketmaster.
+        A dictionary containing matching events, venue, date, location, and ticket info.
     """
-    print(f"\n=======================================================")
-    print(f"[TOOL CALL EXECUTING] Tool: search_artist_events | Input: '{artist_name}'")
-    logger.info(f"🛠️ [TOOL CALL EXECUTING] Tool: search_artist_events | Input: '{artist_name}'")
-
+    logger.info("Tool: search_artist_events | artist=%s", artist_name)
     response = await TicketmasterClient.search_events(keyword=artist_name, size=5)
-
-    # Przygotowanie czytelnego zrzutu JSON response w logach
-    try:
-        response_formatted = json.dumps(response, indent=2, ensure_ascii=False)
-        display_output = response_formatted if len(response_formatted) < 3000 else response_formatted[:3000] + "\n... [TRUNCATED FOR LOGS]"
-    except Exception:
-        display_output = str(response)
-
-    print(f"[TOOL RESPONSE] Ticketmaster API Response for '{artist_name}':\n{display_output}")
-    print(f"=======================================================\n")
-    logger.info(f"📥 [TOOL RESPONSE] Ticketmaster API Response for '{artist_name}' received.")
-
+    logger.debug("Tool: search_artist_events | result_keys=%s", list(response.keys()))
     return response
-
-
-from app.services.aggregator import FestivalAggregator
-from app.services.festival_sources import TicketmasterSource, SupabaseSource, LocalDbSource
-from app.services.transport import get_car_route, get_google_directions, geocode_city
-
-
-def _get_coords_for_location(location_type: str, location_value: str) -> tuple[float, float, float]:
-    """Helper returning (lat, lng, radius_km) for location granularity."""
-    val = (location_value or "").strip().lower()
-    city_coords = {
-        "warszawa": (52.2297, 21.0122, 100.0),
-        "warsaw": (52.2297, 21.0122, 100.0),
-        "krakow": (50.0647, 19.9450, 100.0),
-        "kraków": (50.0647, 19.9450, 100.0),
-        "gdynia": (54.5189, 18.5305, 120.0),
-        "gdansk": (54.3520, 18.6466, 120.0),
-        "gdańsk": (54.3520, 18.6466, 120.0),
-        "katowice": (50.2649, 19.0238, 100.0),
-        "poznan": (52.4064, 16.9252, 100.0),
-        "poznań": (52.4064, 16.9252, 100.0),
-        "wroclaw": (51.1079, 17.0385, 100.0),
-        "wrocław": (51.1079, 17.0385, 100.0),
-        "plock": (52.5463, 19.7065, 100.0),
-        "płock": (52.5463, 19.7065, 100.0),
-        "czaplinek": (53.5550, 16.2333, 100.0),
-        "boom": (51.0880, 4.3667, 150.0),
-        "berlin": (52.5200, 13.4050, 150.0),
-        "paris": (48.8566, 2.3522, 150.0),
-        "london": (51.5074, -0.1278, 150.0),
-        "amsterdam": (52.3676, 4.9041, 150.0),
-        "prague": (50.0755, 14.4378, 150.0),
-        "vienna": (48.2082, 16.3738, 150.0),
-        "budapest": (47.4979, 19.0402, 150.0),
-        "barcelona": (41.3851, 2.1734, 150.0),
-        "europe": (51.1657, 10.4515, 800.0),
-        "pl": (51.9194, 19.1451, 400.0),
-        "poland": (51.9194, 19.1451, 400.0),
-        "de": (51.1657, 10.4515, 400.0),
-        "germany": (51.1657, 10.4515, 400.0),
-    }
-    if val in city_coords:
-        return city_coords[val]
-    if (location_type or "").strip().lower() == "europe" or val == "europe":
-        return (51.1657, 10.4515, 800.0)
-    if (location_type or "").strip().lower() == "country":
-        return (51.9194, 19.1451, 400.0)
-    return (52.0647, 19.2450, 250.0)
 
 
 @tool
@@ -96,54 +63,44 @@ async def discover_festivals(
     location_value: str,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    genres: Optional[List[str]] = None
+    genres: Optional[List[str]] = None,
 ) -> dict:
-    """Search and discover music festivals and major events via FestivalAggregator (Ticketmaster API + Local SQLite DB).
+    """Search and discover music festivals via FestivalAggregator
+    (Ticketmaster API + local SQLite DB).
 
     Args:
-        location_type: Granularity of location search. Must be one of: 'city', 'country', 'europe'.
-        location_value: The value corresponding to location_type (e.g., 'Warszawa' for city, 'PL' for country, 'Europe' for europe).
-        date_from: Optional start date filter in YYYY-MM-DD format (e.g., '2026-07-01').
-        date_to: Optional end date filter in YYYY-MM-DD format (e.g., '2026-08-31').
-        genres: Optional list of music genres to filter festivals by (e.g., ['Rock', 'Electronic']).
+        location_type: Granularity: 'city', 'country', or 'europe'.
+        location_value: Corresponding value (e.g., 'Warszawa', 'PL', 'Europe').
+        date_from: Optional start date filter (YYYY-MM-DD).
+        date_to: Optional end date filter (YYYY-MM-DD).
+        genres: Optional list of genres to filter by (e.g., ['Rock', 'Electronic']).
 
     Returns:
-        A dictionary containing discovered festivals, including dates, venue details, and precise geographic coordinates (`latitude`, `longitude`) for mapping.
+        A dictionary with discovered festivals including coordinates for mapping.
     """
     loc_type = (location_type or "").strip().lower()
     loc_val = (location_value or "").strip()
+    lat, lng, radius_km = get_coords(loc_type, loc_val)
 
-    lat, lng, radius_km = _get_coords_for_location(loc_type, loc_val)
+    logger.info(
+        "Tool: discover_festivals | type=%s val=%s coords=(%s, %s) radius=%skm dates=%s..%s",
+        loc_type, loc_val, lat, lng, radius_km, date_from, date_to,
+    )
 
-    print(f"\n=======================================================")
-    print(f"[TOOL CALL EXECUTING] Tool: discover_festivals (Aggregator) | Type: {loc_type} | Val: {loc_val} | Coords: ({lat}, {lng}) radius={radius_km}km | Dates: {date_from}..{date_to}")
-    logger.info(f"🛠️ [TOOL CALL EXECUTING] Tool: discover_festivals (Aggregator) | Type: {loc_type} | Val: {loc_val}")
-
-    aggregator = FestivalAggregator([TicketmasterSource(), SupabaseSource()])
-    festivals = await aggregator.aggregate_festivals(
-        lat=lat,
-        lng=lng,
-        radius_km=radius_km,
-        start_date=date_from,
-        end_date=date_to
+    festivals = await _aggregator.aggregate_festivals(
+        lat=lat, lng=lng, radius_km=radius_km,
+        start_date=date_from, end_date=date_to,
     )
 
     result = {
         "count": len(festivals),
-        "location_queried": {"type": loc_type, "value": loc_val, "lat": lat, "lng": lng, "radius_km": radius_km},
-        "festivals": festivals
+        "location_queried": {
+            "type": loc_type, "value": loc_val,
+            "lat": lat, "lng": lng, "radius_km": radius_km,
+        },
+        "festivals": festivals,
     }
-
-    try:
-        response_formatted = json.dumps(result, indent=2, ensure_ascii=False)
-        display_output = response_formatted if len(response_formatted) < 3000 else response_formatted[:3000] + "\n... [TRUNCATED FOR LOGS]"
-    except Exception:
-        display_output = str(result)
-
-    print(f"[TOOL RESPONSE] Aggregator Response for discover_festivals ({len(festivals)} items):\n{display_output}")
-    print(f"=======================================================\n")
-    logger.info(f"📥 [TOOL RESPONSE] Aggregator returned {len(festivals)} festivals.")
-
+    logger.info("Tool: discover_festivals | returned %d festivals", len(festivals))
     return result
 
 
@@ -153,80 +110,88 @@ async def get_travel_options(
     destination_city: str,
     destination_lat: float,
     destination_lng: float,
-    date: str
+    date: str,
 ) -> str:
-    """Calculate and compare travel options (Car and Train) between an origin city and the festival destination.
+    """Calculate and compare car and train travel options between two cities.
 
     Args:
-        origin_city: The starting city or town name (e.g., 'Gorzów Śląski'). CRITICAL: This must be a clean geographical location (City, Street, or valid POI). You MUST extract ONLY the city name (e.g., 'Płock, Poland'). You are STRICTLY FORBIDDEN from including event names, dates, pipe characters (|), or ticket types (e.g., '2-day pass') in this string, or the API will fail.
-        destination_city: The destination city (e.g., 'Płock'). CRITICAL: This must be a clean geographical location (City, Street, or valid POI). You MUST extract ONLY the city name (e.g., 'Płock, Poland'). You are STRICTLY FORBIDDEN from including event names, dates, pipe characters (|), or ticket types (e.g., '2-day pass') in this string, or the API will fail.
-        destination_lat: Latitude coordinate of the festival destination.
-        destination_lng: Longitude coordinate of the festival destination.
-        date: The exact date of travel in YYYY-MM-DD format.
+        origin_city: Clean city name of departure (e.g., 'Gorzów Śląski').
+          IMPORTANT: Pass ONLY the city name — never include event names,
+          dates, ticket types, or pipe characters.
+        destination_city: Clean city name of the festival destination.
+        destination_lat: Latitude of the festival destination.
+        destination_lng: Longitude of the festival destination.
+        date: Travel date in YYYY-MM-DD format.
 
     Returns:
-        A combined JSON string containing detailed car driving estimates (time, distance, fuel cost) and top 3 train connections.
+        JSON string with car estimates (time, distance, fuel cost) and
+        top train connections.
     """
-    print(f"\n=======================================================")
-    print(f"[TOOL CALL EXECUTING] Tool: get_travel_options | From: {origin_city} -> To: {destination_city} ({destination_lat}, {destination_lng}) on {date}")
-    logger.info(f"🛠️ [TOOL CALL EXECUTING] Tool: get_travel_options | From: {origin_city} -> To: {destination_city}")
+    logger.info(
+        "Tool: get_travel_options | %s -> %s (%s, %s) on %s",
+        origin_city, destination_city, destination_lat, destination_lng, date,
+    )
 
     orig_lat, orig_lng = await geocode_city(origin_city)
 
-    car_route_task = get_car_route(orig_lat, orig_lng, destination_lat, destination_lng)
-    train_routes_task = get_google_directions(origin_city, destination_city, "transit")
+    car_data, train_data = await asyncio.gather(
+        get_car_route(orig_lat, orig_lng, destination_lat, destination_lng),
+        get_google_directions(origin_city, destination_city, "transit"),
+    )
 
-    car_data, train_data = await asyncio.gather(car_route_task, train_routes_task)
-
-    combined_result = {
+    result = {
         "query": {
             "origin_city": origin_city,
             "origin_coords": {"lat": orig_lat, "lng": orig_lng},
             "destination_city": destination_city,
             "destination_coords": {"lat": destination_lat, "lng": destination_lng},
-            "date": date
+            "date": date,
         },
         "car_option": car_data,
-        "train_options": train_data
+        "train_options": train_data,
     }
 
-    response_json = json.dumps(combined_result, ensure_ascii=False, indent=2)
-    print(f"[TOOL RESPONSE] get_travel_options combined options:\n{response_json}")
-    print(f"=======================================================\n")
-    logger.info(f"📥 [TOOL RESPONSE] get_travel_options returned car and {len(train_data)} train options.")
+    logger.info("Tool: get_travel_options | completed successfully")
+    return json.dumps(result, ensure_ascii=False, indent=2)
 
-    return response_json
 
 @tool
 async def fetch_weather_forecast(city: str, date: str) -> dict:
-    """Use this tool to fetch the 5-day weather forecast for a specific city. Call this when the user asks about festival weather or logistics.
-    ONLY use this tool if the festival/event date is within the next 5 days from today. If the event is more than 5 days in the future, DO NOT call this tool. Instead, rely on your internal knowledge to provide the historical average weather/climate for that specific month and location.
-    
+    """Fetch the 5-day weather forecast for a specific city.
+
+    ONLY call this tool if the festival/event date is within the next 5 days.
+    For events further in the future, rely on internal knowledge of seasonal
+    climate averages for that location and month instead.
+
     Args:
-        city: The name of the city to get the forecast for (e.g., 'Berlin', 'Warsaw').
-        date: The date of the event in YYYY-MM-DD format.
+        city: City name to get the forecast for (e.g., 'Berlin', 'Warsaw').
+        date: Event date in YYYY-MM-DD format.
     """
-    print(f"\n=======================================================")
-    print(f"[TOOL CALL EXECUTING] Tool: fetch_weather_forecast | City: '{city}'")
-    logger.info(f"🛠️ [TOOL CALL EXECUTING] Tool: fetch_weather_forecast | City: '{city}'")
-    
-    from app.services.weather import fetch_weather
+    logger.info("Tool: fetch_weather_forecast | city=%s date=%s", city, date)
     response = await fetch_weather(city, date)
-    
-    print(f"[TOOL RESPONSE] Weather API Response for '{city}':\n{json.dumps(response, indent=2)}")
-    print(f"=======================================================\n")
-    logger.info(f"📥 [TOOL RESPONSE] fetch_weather_forecast completed.")
-    
+    logger.info("Tool: fetch_weather_forecast | completed")
     return response
 
+
+# ---------------------------------------------------------------------------
+# LangGraph Node
+# ---------------------------------------------------------------------------
+
+
 async def lineup_node(state: PlannerState) -> dict:
-    """LangGraph node acting as an AI Concierge reading context and answering questions or discovering events."""
+    """LangGraph node — AI Concierge that reads context and answers questions
+    or invokes tools for discovery, routing, and weather."""
     llm = get_llm(temperature=0.2)
-    llm_with_tools = llm.bind_tools([search_artist_events, discover_festivals, get_travel_options, fetch_weather_forecast])
+    llm_with_tools = llm.bind_tools(
+        [search_artist_events, discover_festivals, get_travel_options, fetch_weather_forecast]
+    )
 
     context = state.get("context") or {}
-    festival_name = context.get("name") or context.get("festival_name") or "the selected music festival"
-    location = context.get("location") or (f"{context.get('lat')}, {context.get('lng')}" if context.get("lat") else "selected region")
+    festival_name = context.get("name") or context.get("festival_name") or "the selected festival"
+    location = (
+        context.get("location")
+        or (f"{context.get('lat')}, {context.get('lng')}" if context.get("lat") else "selected region")
+    )
     start_date = context.get("date") or context.get("start_date") or "upcoming dates"
     end_date = context.get("end_date") or ""
     festival_url = context.get("url") or ""
@@ -235,77 +200,69 @@ async def lineup_node(state: PlannerState) -> dict:
     music_genres = context.get("music_genres", [])
     genres_str = ", ".join(music_genres) if isinstance(music_genres, list) else str(music_genres)
 
+    date_range = f"{start_date} to {end_date}" if end_date else start_date
+    url_line = f"Official Link: {festival_url}" if festival_url else ""
+
     system_prompt = f"""You are an AI Festival Concierge & Travel Guide.
 Today is {datetime.now().strftime('%B %d, %Y')}.
+
 Your primary goals:
-1. Act as a dedicated, knowledgeable concierge for {festival_name} (Location: {location}, Dates: {start_date}{f' to {end_date}' if end_date else ''}).
-   {f'Official Link: {festival_url}' if festival_url else ''}
-2. Logistics & Transport Planning: When a user asks "How do I get there?", "Plan my travel", "What are travel options?", or asks about logistics/transport from their location ({travel_from}), you MUST invoke the `get_travel_options` tool using `origin_city`="{travel_from}", `destination_city`="{location}", `destination_lat`={context.get('lat', 52.2297)}, `destination_lng`={context.get('lng', 21.0122)}, and `date`="{start_date}".
-3. Answer any user questions about travel logistics, estimated costs/budget ({budget} PLN), accommodations, festival rules, and lineup advice using the travel data retrieved. IMPORTANT: When summarizing transit/train routes, you MUST explicitly output the specific train station names provided in the tool response (e.g., "Warszawa Zachodnia", "Berlin Hbf"), rather than just echoing the generic city name. Do not assume the user departs from the city center if the train leaves from a specific station.
-4. Event Discovery: When the user asks for festivals or events in a specific timeframe (date range) or geographic area (city, country, or 'Europe'), intelligently invoke the `discover_festivals` tool with appropriate parameters (`location_type`, `location_value`, `date_from`, `date_to`, `genres`).
-5. Artist Checking: Use `search_artist_events` ONLY with specific artist/band names (e.g., 'Arctic Monkeys', 'Dua Lipa') to check their upcoming tour dates. NEVER pass a festival name as an artist name to `search_artist_events`.
-6. Weather Forecast: Use `fetch_weather_forecast` when the user asks about the weather for the festival city.
-7. Coordinates & Mapping: When `discover_festivals` or `search_artist_events` returns events with venue geographic coordinates (`latitude` and `longitude`), clearly summarize these coordinates or note that raw festival coordinates have been saved for frontend mapping and location visualization.
+1. Act as a knowledgeable concierge for {festival_name}
+   (Location: {location}, Dates: {date_range}). {url_line}
 
-User context/preferences:
-- Favorite genres: {genres_str}
+2. Logistics & Transport: When a user asks about travel, invoke `get_travel_options`
+   with origin_city="{travel_from}", destination_city="{location}",
+   destination_lat={context.get('lat', 52.2297)}, destination_lng={context.get('lng', 21.0122)},
+   date="{start_date}". When summarising routes, always include the specific station
+   names from the tool response (e.g., "Warszawa Zachodnia"), not just the city.
+
+3. Event Discovery: Use `discover_festivals` when the user asks for events in a
+   specific timeframe or area. Pass location_type ('city'/'country'/'europe'),
+   location_value, and optional date_from/date_to filters.
+
+4. Artist Lookup: Use `search_artist_events` ONLY with a specific artist/band name.
+   Never pass a festival name as an artist name.
+
+5. Weather: Use `fetch_weather_forecast` only if the event date is within 5 days.
+   For future events, describe seasonal climate from your knowledge instead.
+
+User preferences:
+- Favourite genres: {genres_str}
 - Budget: {budget} PLN
-- Traveling from: {travel_from}
+- Travelling from: {travel_from}
 
-Always provide a detailed, highly engaging, structured markdown response."""
+Always provide a detailed, engaging, structured markdown response."""
 
     user_messages = list(state.get("messages", []))
     is_initial_turn = len(user_messages) == 0
 
     if is_initial_turn:
-        initial_human_msg = HumanMessage(
-            content=(
-                f"Please provide concierge advice, lineup highlights, and travel tips for {festival_name} "
-                f"(Location: {location}, Dates: {start_date}{f' to {end_date}' if end_date else ''}).\n"
-                f"User preferences -> Music genres: {genres_str}, Budget: {budget} PLN, Traveling from: {travel_from}.\n"
-                f"Use `discover_festivals`, `search_artist_events`, or `get_travel_options` tools as needed to discover events, check tour dates, or plan transport."
+        user_messages = [
+            HumanMessage(
+                content=(
+                    f"Please provide concierge advice, lineup highlights, and travel tips "
+                    f"for {festival_name} (Location: {location}, Dates: {date_range}).\n"
+                    f"User preferences -> Genres: {genres_str}, Budget: {budget} PLN, "
+                    f"Travelling from: {travel_from}.\n"
+                    f"Use available tools to discover events, check tour dates, or plan transport."
+                )
             )
-        )
-        user_messages = [initial_human_msg]
+        ]
 
     messages = [SystemMessage(content=system_prompt)] + user_messages
     llm_response = await llm_with_tools.ainvoke(messages)
 
     if hasattr(llm_response, "tool_calls") and llm_response.tool_calls:
-        logger.info(f"🤖 [NODE: lineup_agent] AI decided to call tools: {llm_response.tool_calls}")
+        logger.info("lineup_node: AI requested tools: %s", [tc["name"] for tc in llm_response.tool_calls])
 
     # Extract weather forecast from tool messages if present in the state history
     weather_forecast = state.get("weather_forecast")
-    if user_messages:
-        for msg in reversed(user_messages):
-            if getattr(msg, "type", "") == "tool" and getattr(msg, "name", "") == "fetch_weather_forecast":
-                try:
-                    weather_data = json.loads(msg.content)
-                    weather_forecast = weather_data
-                except Exception:
-                    pass
-                break
-
-    return {"messages": [llm_response], "weather_forecast": weather_forecast}
-
-    # Extract discovered festivals with coordinates across messages
-    discovered_festivals = list(state.get("discovered_festivals", [])) if isinstance(state, dict) else []
-    seen_ids = {f.get("id") for f in discovered_festivals if isinstance(f, dict) and f.get("id")}
-
-    for msg in user_messages + [llm_response]:
-        if hasattr(msg, "content") and isinstance(msg.content, str):
+    for msg in reversed(user_messages):
+        if getattr(msg, "type", "") == "tool" and getattr(msg, "name", "") == "fetch_weather_forecast":
             try:
-                data = json.loads(msg.content)
-                if isinstance(data, dict) and "_embedded" in data and "events" in data["_embedded"]:
-                    for ev in data["_embedded"]["events"]:
-                        ev_id = ev.get("id")
-                        if ev_id and ev_id not in seen_ids:
-                            seen_ids.add(ev_id)
-                            discovered_festivals.append(ev)
+                weather_forecast = json.loads(msg.content)
             except Exception:
                 pass
+            break
 
-    if is_initial_turn:
-        return {"messages": [user_messages[0], llm_response]}
-    return {"messages": [llm_response]}
-
+    return {"messages": [llm_response], "weather_forecast": weather_forecast}

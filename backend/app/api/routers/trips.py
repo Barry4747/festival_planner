@@ -1,107 +1,116 @@
-from typing import Dict, Any, List
-from fastapi import APIRouter, Depends, Path, HTTPException, status
-from pydantic import BaseModel
-from supabase import Client
-from app.db.database import get_supabase_client
-from app.core.supabase import get_current_user
+"""Router for user saved trips.
 
+All database operations go through the official supabase-py SDK — NOT raw httpx
+calls to the REST API. This ensures correct connection management, error handling,
+and avoids duplicating authentication headers by hand.
+"""
+import logging
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, Depends, HTTPException, Path, status
+from pydantic import BaseModel, Field
+from supabase import Client
+
+from app.core.supabase import get_current_user
+from app.db.database import get_supabase_client
+
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
 class TripRequest(BaseModel):
-    festival_id: str
-    festival_name: str
+    festival_id: str = Field(..., min_length=1)
+    festival_name: str = Field(..., min_length=1, max_length=255)
     festival_data: Dict[str, Any]
 
-import httpx
-from app.core.config import settings
 
-@router.get("/")
+def _get_user_id(user: Dict[str, Any]) -> str:
+    """Extract user ID from the verified token payload, raising 401 if missing."""
+    user_id = user.get("id") or user.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user session.",
+        )
+    return str(user_id)
+
+
+@router.get("/", response_model=List[Dict[str, Any]])
 async def get_trips(
     user: Dict[str, Any] = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client),
 ) -> List[Dict[str, Any]]:
-    """Get all saved trips for the authenticated user."""
-    user_id = user.get("id") or user.get("sub")
-    token = user.get("access_token")
-    if not user_id or not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User ID or token not found")
-
+    """Return all saved trips for the authenticated user, ordered newest first."""
+    user_id = _get_user_id(user)
     try:
-        headers = {
-            "apikey": settings.SUPABASE_KEY,
-            "Authorization": f"Bearer {token}",
-        }
-        async with httpx.AsyncClient() as client:
-            res = await client.get(
-                f"{settings.SUPABASE_URL}/rest/v1/user_trips",
-                headers=headers,
-                params={"user_id": f"eq.{user_id}", "order": "created_at.desc"}
-            )
-            res.raise_for_status()
-            return res.json()
+        result = (
+            supabase.table("user_trips")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return result.data or []
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to fetch trips: {str(e)}")
+        logger.error("Failed to fetch trips for user %s: %s", user_id, e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve trips. Please try again.",
+        )
 
-@router.post("/")
+
+@router.post("/", response_model=Dict[str, str])
 async def save_trip(
     trip: TripRequest,
     user: Dict[str, Any] = Depends(get_current_user),
-) -> Dict[str, Any]:
-    """Save a festival to the user's trips."""
-    user_id = user.get("id") or user.get("sub")
-    token = user.get("access_token")
-    if not user_id or not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User ID or token not found")
-
+    supabase: Client = Depends(get_supabase_client),
+) -> Dict[str, str]:
+    """Save (or upsert) a festival to the user's trips."""
+    user_id = _get_user_id(user)
     payload = {
         "user_id": user_id,
         "festival_id": trip.festival_id,
         "festival_name": trip.festival_name,
         "festival_data": trip.festival_data,
     }
-
     try:
-        headers = {
-            "apikey": settings.SUPABASE_KEY,
-            "Authorization": f"Bearer {token}",
-            "Prefer": "resolution=merge-duplicates"
-        }
-        async with httpx.AsyncClient() as client:
-            res = await client.post(
-                f"{settings.SUPABASE_URL}/rest/v1/user_trips",
-                headers=headers,
-                json=payload,
-                params={"on_conflict": "user_id,festival_id"}
-            )
-            res.raise_for_status()
-            
+        (
+            supabase.table("user_trips")
+            .upsert(payload, on_conflict="user_id,festival_id")
+            .execute()
+        )
         return {"status": "success"}
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to save trip: {str(e)}")
+        logger.error("Failed to save trip for user %s: %s", user_id, e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save trip. Please try again.",
+        )
 
-@router.delete("/{festival_id}")
+
+@router.delete("/{festival_id}", response_model=Dict[str, str])
 async def delete_trip(
-    festival_id: str,
+    festival_id: str = Path(..., min_length=1),
     user: Dict[str, Any] = Depends(get_current_user),
-) -> Dict[str, Any]:
-    """Remove a festival from the user's trips."""
-    user_id = user.get("id") or user.get("sub")
-    token = user.get("access_token")
-    if not user_id or not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User ID or token not found")
-
+    supabase: Client = Depends(get_supabase_client),
+) -> Dict[str, str]:
+    """Remove a festival from the user's saved trips."""
+    user_id = _get_user_id(user)
     try:
-        headers = {
-            "apikey": settings.SUPABASE_KEY,
-            "Authorization": f"Bearer {token}",
-        }
-        async with httpx.AsyncClient() as client:
-            res = await client.delete(
-                f"{settings.SUPABASE_URL}/rest/v1/user_trips",
-                headers=headers,
-                params={"user_id": f"eq.{user_id}", "festival_id": f"eq.{festival_id}"}
-            )
-            res.raise_for_status()
-            
+        (
+            supabase.table("user_trips")
+            .delete()
+            .eq("user_id", user_id)
+            .eq("festival_id", festival_id)
+            .execute()
+        )
         return {"status": "success"}
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to delete trip: {str(e)}")
+        logger.error(
+            "Failed to delete trip %s for user %s: %s",
+            festival_id, user_id, e, exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete trip. Please try again.",
+        )

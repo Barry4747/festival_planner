@@ -32,7 +32,46 @@
   },
   "auth": {
     "label": "Dostęp",
-    "title": "Utwórz konto"
+    "title": "Utwórz konto",
+    "signup": "Załóż konto",
+    "signin": "Zaloguj się",
+    "redirecting": "Przekierowanie...",
+    "google": "Kontynuuj z Google",
+    "orEmail": "lub e-mail",
+    "emailLabel": "Adres e-mail",
+    "passwordLabel": "Hasło",
+    "emailPlaceholder": "festiwalowicz@rave.com",
+    "submitSignup": "Utwórz konto",
+    "submitSignin": "Zaloguj się",
+    "successSignup": "Konto utworzone! Sprawdź skrzynkę, aby potwierdzić adres e-mail.",
+    "errorGeneric": "Wystąpił błąd. Spróbuj ponownie.",
+    "errorGoogle": "Logowanie przez Google nie powiodło się."
+  },
+  "upgrade": {
+    "title": "Wybierz swój plan",
+    "currentPlanText": "Obecnie korzystasz z planu:",
+    "freeSubtitle": "Darmowy",
+    "basicSubtitle": "Więcej możliwości",
+    "proSubtitle": "Premium",
+    "perMonth": "msc",
+    "aiLimit": "Limit {{n}} zapytań AI",
+    "aiDaily": "{{n}} zapytań AI dziennie",
+    "basicRoutes": "Podstawowe trasy ({{n}}/d)",
+    "advancedRoutes": "Zaawansowane trasy ({{n}}/d)",
+    "priorityRoutes": "Priorytetowe trasy ({{n}}/d)",
+    "weatherBasic": "Podgląd pogody ({{n}}/d)",
+    "weatherAdvanced": "Dokładna pogoda ({{n}}/d)",
+    "dbQueries": "Zapytania do bazy ({{n}}/d)",
+    "earlyAccess": "Wczesny dostęp do nowości",
+    "dedicatedSupport": "Dedykowane wsparcie ({{n}}/d)",
+    "currentPlan": "Obecny Plan",
+    "select": "Wybierz",
+    "start": "Rozpocznij",
+    "recommendedBadge": "POLECANY"
+  },
+  "map": {
+    "searching": "Wyszukiwanie...",
+    "center": "Centrum"
   },
   "footer": {
     "copyright": "© 2026 Festival Planner AI"

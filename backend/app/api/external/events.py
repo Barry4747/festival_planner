@@ -25,29 +25,22 @@ class TicketmasterClient:
 
         # Bezpieczne logowanie parametrów (ukrycie klucza API w logach)
         safe_params = {k: (v if k != "apikey" else "***") for k, v in params.items()}
-        print(f"\n[TICKETMASTER HTTP REQUEST] GET {url} | Params: {safe_params}")
-        logger.info(f"🌐 [TICKETMASTER HTTP REQUEST] GET {url} | Params: {safe_params}")
+        logger.debug("Ticketmaster GET %s | params=%s", url, safe_params)
 
-        # Ticketmaster zazwyczaj nie wymaga spoofingu User-Agent, ale go zostawiamy dla spójności
         async with httpx.AsyncClient(timeout=15.0) as client:
             try:
                 response = await client.get(url, params=params)
-                
-                # Przechwytywanie przekroczenia limitu zapytań (kod 429) z dokumentacji
+
                 if response.status_code == 429:
-                    msg = "Przekroczono limit Ticketmaster API (429 Too Many Requests)."
-                    print(f"[TICKETMASTER HTTP ERROR] {msg}")
-                    logger.warning(msg)
+                    logger.warning("Ticketmaster rate limit exceeded (429) for %s", url)
                     return {"error": "Rate limit exceeded. Please try again later."}
-                    
+
                 response.raise_for_status()
                 data = response.json()
-                print(f"[TICKETMASTER HTTP RESPONSE] Status: {response.status_code} OK | Keys in response: {list(data.keys())}")
-                logger.info(f"🌐 [TICKETMASTER HTTP RESPONSE] Status: {response.status_code} OK")
+                logger.debug("Ticketmaster response %d | keys=%s", response.status_code, list(data.keys()))
                 return data
             except httpx.HTTPError as e:
-                print(f"[TICKETMASTER HTTP ERROR] {e}")
-                logger.error(f"Błąd Ticketmaster API: {e}")
+                logger.error("Ticketmaster HTTP error: %s", e)
                 return {"error": str(e)}
 
     @staticmethod
@@ -92,8 +85,7 @@ class TicketmasterClient:
         if is_europe:
             import asyncio
             europe_countries = ["PL", "DE", "GB", "FR", "ES", "NL", "CZ"]
-            print(f"[TICKETMASTER] Searching across Europe ({len(europe_countries)} major countries)...")
-            logger.info(f"🌍 [TICKETMASTER] Searching across Europe ({len(europe_countries)} major countries)...")
+            logger.info("Ticketmaster: searching across Europe (%d countries)", len(europe_countries))
             
             sem = asyncio.Semaphore(3)
             async def fetch_for_country(cc: str):

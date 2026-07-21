@@ -3,9 +3,11 @@ import datetime
 import logging
 import math
 from typing import Any, Dict, List, Tuple
+
 import httpx
 import polyline
-import os
+
+from app.core.geo_constants import CITY_COORDS
 
 logger = logging.getLogger("festival_planner.services.transport")
 
@@ -25,10 +27,13 @@ def _calculate_haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) 
 
 
 async def geocode_city(city_name: str) -> Tuple[float, float]:
-    """Geocode a city name to (latitude, longitude) using OpenStreetMap Nominatim API."""
+    """Geocode a city name to (latitude, longitude) using OpenStreetMap Nominatim API.
+
+    Falls back to the shared CITY_COORDS lookup table when the API is unreachable.
+    """
     city_clean = city_name.strip()
     if not city_clean:
-        return (52.2297, 21.0122)  # Default Warsaw
+        return (52.2297, 21.0122)  # Warsaw default
 
     url = "https://nominatim.openstreetmap.org/search"
     params = {"q": city_clean, "format": "json", "limit": 1}
@@ -39,39 +44,21 @@ async def geocode_city(city_name: str) -> Tuple[float, float]:
             resp = await client.get(url, params=params, headers=headers)
             if resp.status_code == 200:
                 data = resp.json()
-                if isinstance(data, list) and len(data) > 0:
+                if isinstance(data, list) and data:
                     lat = float(data[0].get("lat", 0.0))
                     lon = float(data[0].get("lon", 0.0))
-                    logger.info(f"📍 [geocode_city] Geocoded '{city_name}' -> ({lat}, {lon})")
+                    logger.info("geocode_city: '%s' -> (%s, %s)", city_name, lat, lon)
                     return (lat, lon)
     except Exception as e:
-        logger.warning(f"⚠️ [geocode_city] Nominatim lookup failed for '{city_name}': {e}")
+        logger.warning("geocode_city: Nominatim lookup failed for '%s': %s", city_name, e)
 
-    # Common fallbacks if API is unreachable
+    # Fallback: shared geo constants (single source of truth)
     city_lower = city_clean.lower()
-    fallbacks = {
-        "warsaw": (52.2297, 21.0122),
-        "warszawa": (52.2297, 21.0122),
-        "krakow": (50.0647, 19.9450),
-        "kraków": (50.0647, 19.9450),
-        "gdansk": (54.3520, 18.6466),
-        "gdańsk": (54.3520, 18.6466),
-        "gdynia": (54.5189, 18.5305),
-        "katowice": (50.2649, 19.0238),
-        "poznan": (52.4064, 16.9252),
-        "poznań": (52.4064, 16.9252),
-        "wroclaw": (51.1079, 17.0385),
-        "wrocław": (51.1079, 17.0385),
-        "plock": (52.5463, 19.7065),
-        "płock": (52.5463, 19.7065),
-        "czaplinek": (53.5550, 16.2333),
-        "berlin": (52.5200, 13.4050),
-        "paris": (48.8566, 2.3522),
-        "london": (51.5074, -0.1278),
-    }
-    if city_lower in fallbacks:
-        return fallbacks[city_lower]
+    if city_lower in CITY_COORDS:
+        lat, lng, _ = CITY_COORDS[city_lower]
+        return (lat, lng)
 
+    logger.warning("geocode_city: '%s' not found, returning Warsaw default", city_name)
     return (52.2297, 21.0122)
 
 

@@ -1,17 +1,22 @@
-from typing import Optional
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Festival Planner"
     ENVIRONMENT: str = "development"
     FRONTEND_URL: str
+
+    # CORS — comma-separated list of allowed origins, e.g.:
+    # ALLOWED_ORIGINS=http://localhost:5173,https://yourapp.com
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:5173"]
+
     SUPABASE_URL: str
     SUPABASE_KEY: str
     DATABASE_URL: str
     GEMINI_API_KEY: str
     GEMINI_MODEL: str = "gemini-3.1-flash-lite"
+    REDIS_URL: str = "redis://localhost:6379"
 
-    
     # Weather API
     OPENWEATHER_API_KEY: Optional[str] = None
     OPEN_METEO_URL: str = "https://api.open-meteo.com/v1/forecast"

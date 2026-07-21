@@ -1,7 +1,19 @@
+import json
 import logging
-from typing import Dict, Any, Optional, List
-from langchain_core.messages import HumanMessage, AIMessage
+from typing import Any, Dict, List, Optional
+
+from langchain_core.messages import AIMessage, HumanMessage
+
 from app.repositories import FestivalRepository
+
+# NOTE: planner_app is imported here rather than at the top of the module
+# because the agents package and the services package mutually depend on each
+# other (agents -> services -> concierge_service -> agents/graph).  Python's
+# module-level import machinery handles this correctly when the import is deferred
+# to after both modules are fully defined, but would cause a circular ImportError
+# if placed at the very top alongside the langchain imports above.
+# If the architecture is refactored to break the cycle this should be moved up.
+from app.agents.graph import planner_app  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

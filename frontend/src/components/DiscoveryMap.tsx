@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+
 import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, CircleMarker, Tooltip, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { api } from '../lib/axios';
@@ -15,6 +16,7 @@ import {
   BookmarkCheck,
 } from 'lucide-react';
 import { usePlannerStore } from '../store/usePlannerStore';
+import { useTranslation } from 'react-i18next';
 
 // Ensure default icon compatibility with Vite
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
@@ -57,12 +59,18 @@ const OriginPinIcon = L.divIcon({
   iconAnchor: [15, 15],
 });
 
-const CenterPinIcon = L.divIcon({
+const getCenterPinIcon = (isLoading: boolean) => L.divIcon({
   className: 'bg-transparent border-none',
   html: `<div class="relative flex h-8 w-8 items-center justify-center">
-    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40"></span>
+    ${isLoading 
+      ? `<span class="absolute inline-flex h-12 w-12 animate-ping rounded-full bg-emerald-500 opacity-60"></span>` 
+      : `<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40"></span>`
+    }
     <div class="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-500 shadow-md">
-      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
+      ${isLoading
+        ? `<svg class="animate-spin text-white w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`
+        : `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>`
+      }
     </div>
   </div>`,
   iconSize: [32, 32],
@@ -170,17 +178,23 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
   onToggleSavedTrip,
   originCoords,
 }) => {
+  const { t } = useTranslation();
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState<boolean>(false);
   const [savingTripId, setSavingTripId] = useState<string | null>(null);
   // Default pin: Warsaw / Central Poland
   const [pin, setPin] = useState<{ lat: number; lng: number }>({ lat: 52.2297, lng: 21.0122 });
   const [radiusKm, setRadiusKm] = useState<number>(100);
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState<string>(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().split('T')[0];
+  });
   const [festivals, setFestivals] = useState<FestivalItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const debounceTimer = useRef<any>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 
   const activeTab = usePlannerStore((state) => state.activeTab);
   const weatherLayer = usePlannerStore((state) => state.weatherLayer);
@@ -203,15 +217,18 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
         try {
           const res = await api.get(`/api/weather/current?lat=${originCoords[0]}&lon=${originCoords[1]}`);
           if (!res.data.error) points.push({ ...res.data, label: 'Origin' });
-        } catch(e) {}
+        } catch (e) {
+          console.warn('[DiscoveryMap] Failed to fetch origin weather:', e);
+        }
       }
-      
+
       const destCoords = selectedFestival ? [selectedFestival.lat, selectedFestival.lng] : [pin.lat, pin.lng];
       try {
         const res = await api.get(`/api/weather/current?lat=${destCoords[0]}&lon=${destCoords[1]}`);
         if (!res.data.error) points.push({ ...res.data, label: selectedFestival ? selectedFestival.name : 'Destination' });
-      } catch(e) {}
-      
+      } catch (e) {
+        console.warn('[DiscoveryMap] Failed to fetch destination weather:', e);
+      }
       if (isMounted) {
         // Filter out duplicates if origin and destination are the same/very close
         const uniquePoints = points.filter((p, i, self) => 
@@ -235,44 +252,48 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
     }
   };
 
-  const fetchFestivals = async (lat: number, lng: number, radius: number, start: string, end: string) => {
-    setLoading(true);
-    if (onLoadingChange) onLoadingChange(true);
-    setError(null);
-    try {
-      const params: any = {
-        lat: lat.toFixed(4),
-        lng: lng.toFixed(4),
-        radius_km: radius,
-      };
-      if (start) params.start_date = start;
-      if (end) params.end_date = end;
+  const fetchFestivals = useCallback(
+    async (lat: number, lng: number, radius: number, start: string, end: string) => {
+      setLoading(true);
+      if (onLoadingChange) onLoadingChange(true);
+      setError(null);
+      try {
+        const params: Record<string, string | number> = {
+          lat: Number(lat.toFixed(4)),
+          lng: Number(lng.toFixed(4)),
+          radius_km: radius,
+        };
+        if (start) params.start_date = start;
+        if (end) params.end_date = end;
 
-      const response = await api.get('/api/festivals/map', { params });
-      const items: FestivalItem[] = Array.isArray(response.data)
-        ? response.data
-        : response.data?.festivals || [];
-      setFestivals(items);
-      if (onFestivalsLoaded) onFestivalsLoaded(items);
-    } catch (err: any) {
-      console.error('Failed to fetch map festivals:', err);
-      setError('Could not load festivals for this location.');
-    } finally {
-      setLoading(false);
-      if (onLoadingChange) onLoadingChange(false);
-    }
-  };
+        const response = await api.get('/api/festivals/map', { params });
+        const items: FestivalItem[] = Array.isArray(response.data)
+          ? response.data
+          : response.data?.festivals ?? [];
+        setFestivals(items);
+        if (onFestivalsLoaded) onFestivalsLoaded(items);
+      } catch (err: unknown) {
+        console.error('[DiscoveryMap] Failed to fetch map festivals:', err);
+        setError('Could not load festivals for this location.');
+      } finally {
+        setLoading(false);
+        if (onLoadingChange) onLoadingChange(false);
+      }
+    },
+    [onFestivalsLoaded, onLoadingChange],
+  );
+
 
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       fetchFestivals(pin.lat, pin.lng, radiusKm, startDate, endDate);
     }, 400);
-
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [pin.lat, pin.lng, radiusKm, startDate, endDate]);
+  }, [pin.lat, pin.lng, radiusKm, startDate, endDate, fetchFestivals]);
+
 
   const handlePinChange = (lat: number, lng: number) => {
     setPin({ lat, lng });
@@ -513,13 +534,10 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
           />
 
           {/* Search Center Pin */}
-          <Marker position={[pin.lat, pin.lng]} icon={CenterPinIcon}>
-            <Popup>
-              <div style={{ fontFamily: 'Inter, sans-serif', padding: '4px', textAlign: 'center' }}>
-                <p style={{ fontSize: '11px', fontWeight: 700, color: '#121212', margin: '0 0 2px' }}>Search Center</p>
-                <p style={{ fontSize: '10px', color: '#6b7280', margin: 0 }}>Showing festivals within {radiusKm} km</p>
-              </div>
-            </Popup>
+          <Marker position={[pin.lat, pin.lng]} icon={getCenterPinIcon(loading)} interactive={false}>
+            <Tooltip direction="bottom" offset={[0, 10]} opacity={0.9} permanent className="!bg-[#18181b] !border-[#27272a] !text-white !font-bold !text-[10px] !p-1 !rounded">
+              {loading ? t('map.searching') : t('map.center')}
+            </Tooltip>
           </Marker>
           {/* Origin City Pin (from Logistics panel) */}
           {originCoords && (

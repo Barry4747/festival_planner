@@ -128,7 +128,7 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
   }
 
   return (
-    <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, height: '100%', minHeight: 0 }}>
       {/* Origin input */}
       <div>
         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#A1A1AA', marginBottom: '8px' }}>
@@ -147,7 +147,7 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
               title="Locate Me"
               style={{
                 position: 'absolute',
-                right: '4px',
+                right: '32px',
                 top: '50%',
                 transform: 'translateY(-50%)',
                 background: 'none',
@@ -248,7 +248,7 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
 
           {/* Train results */}
           {activeTransportMode === 'train' && transportData.train && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '320px', overflowY: 'auto' }} className="no-scrollbar">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '4px' }} className="no-scrollbar">
               
               {transportData.train.message && (
                 <div style={{ padding: '8px 12px', backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '2px', display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '4px' }}>

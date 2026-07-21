@@ -337,39 +337,25 @@ export const LandingPage: React.FC = () => {
 
       {/* ── AUTH SECTION ── */}
       <section 
-        id="access-section" 
+        id="auth-section"
         ref={authSectionRef}
-        style={{ 
-          position: 'relative',
-          backgroundColor: '#1E1E1E', 
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '80px 24px',
+        className="relative min-h-[100dvh] flex flex-col items-center justify-center p-6 overflow-hidden"
+        style={{
           backgroundImage: 'url(/landing-behind-sso.jpg)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundAttachment: 'fixed',
-          overflow: 'hidden'
         }}
       >
-        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(18,18,18,0.7)', zIndex: 0 }}></div>
-        <div ref={authContentRef} style={{ width: '100%', maxWidth: '420px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-          <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', color: '#10B981', textTransform: 'uppercase', marginBottom: '16px', textAlign: 'center' }}>
+        <div className="absolute inset-0 bg-zinc-950/80 z-0"></div>
+        <div ref={authContentRef} className="w-full max-w-md mx-auto relative z-10">
+          <p className="text-[0.7rem] tracking-widest text-emerald-500 font-semibold uppercase mb-4 text-center">
             {t('auth.label')}
           </p>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#EDEDED', marginBottom: '40px', textAlign: 'center' }}>
+          <h2 className="text-2xl font-bold text-zinc-100 mb-10 text-center">
             {t('auth.title')}
           </h2>
-          <div style={{ 
-            backgroundColor: '#1E1E1E', 
-            padding: '40px 32px', 
-            borderRadius: '4px',
-            border: '1px solid #2D2D2D',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-          }}>
+          <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 p-8 rounded-2xl shadow-2xl w-full mx-auto">
             <AuthSection onSuccess={handleAuthSuccess} />
           </div>
         </div>

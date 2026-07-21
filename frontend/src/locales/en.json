@@ -32,7 +32,46 @@
   },
   "auth": {
     "label": "Access",
-    "title": "Create your account"
+    "title": "Create your account",
+    "signup": "Sign Up",
+    "signin": "Sign In",
+    "redirecting": "Redirecting...",
+    "google": "Continue with Google",
+    "orEmail": "or e-mail",
+    "emailLabel": "Email Address",
+    "passwordLabel": "Password",
+    "emailPlaceholder": "raver@rave.com",
+    "submitSignup": "Create Account",
+    "submitSignin": "Sign In",
+    "successSignup": "Account created! Check your inbox to confirm your email.",
+    "errorGeneric": "An error occurred. Please try again.",
+    "errorGoogle": "Google sign-in failed. Please try again."
+  },
+  "upgrade": {
+    "title": "Choose your plan",
+    "currentPlanText": "You are currently on:",
+    "freeSubtitle": "Free",
+    "basicSubtitle": "More features",
+    "proSubtitle": "Premium",
+    "perMonth": "mo",
+    "aiLimit": "Limit of {{n}} AI queries",
+    "aiDaily": "{{n}} AI queries per day",
+    "basicRoutes": "Basic routes ({{n}}/d)",
+    "advancedRoutes": "Advanced routes ({{n}}/d)",
+    "priorityRoutes": "Priority routes ({{n}}/d)",
+    "weatherBasic": "Weather overview ({{n}}/d)",
+    "weatherAdvanced": "Detailed weather ({{n}}/d)",
+    "dbQueries": "Database queries ({{n}}/d)",
+    "earlyAccess": "Early access to new features",
+    "dedicatedSupport": "Dedicated support ({{n}}/d)",
+    "currentPlan": "Current Plan",
+    "select": "Select",
+    "start": "Get Started",
+    "recommendedBadge": "RECOMMENDED"
+  },
+  "map": {
+    "searching": "Searching...",
+    "center": "Center"
   },
   "footer": {
     "copyright": "© 2026 Festival Planner AI"

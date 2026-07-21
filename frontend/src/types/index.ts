@@ -20,3 +20,6 @@ export interface Festival {
 }
 
 export type FestivalItem = Festival;
+
+// Re-export weather types so consumers can import from a single location
+export type { CurrentWeather, WeatherCondition, WeatherDay, WeatherForecast } from './weather';
