@@ -53,12 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({ userEmail, userAvatar, userName 
       <div className="mx-auto flex h-14 max-w-full items-center justify-between px-6">
         {/* Logo */}
         <NavLink to="/discover" className="flex items-center gap-2.5 group">
-          <span
-            className="text-sm font-bold tracking-widest uppercase transition-colors duration-300 group-hover:opacity-80"
-            style={{ color: '#10B981', letterSpacing: '0.15em' }}
-          >
-            FP
-          </span>
+          <img src="/logo-simple-transparent.svg" alt="LINEUP Logo" className="h-6 w-auto transition-opacity duration-300 group-hover:opacity-80" />
           <span
             className="hidden sm:block text-sm font-medium tracking-wide"
             style={{ color: '#EDEDED' }}

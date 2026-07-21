@@ -2,7 +2,7 @@ from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Festival Planner"
+    PROJECT_NAME: str = "LINEUP"
     ENVIRONMENT: str = "development"
     FRONTEND_URL: str
 

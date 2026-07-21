@@ -1,7 +1,7 @@
 {
   "nav": {
-    "logo": "Festival Planner",
-    "title": "FESTIVAL PLANNER",
+    "logo": "LINEUP",
+    "title": "LINEUP",
     "get_access": "Get Access",
     "discover": "Discover",
     "myTrips": "My Trips",
@@ -23,7 +23,7 @@
     "title": "Every tool you need, in one place.",
     "map_title": "Interactive Map",
     "map_desc": "Live festival discovery across Europe. Click any pin to start planning.",
-    "ai_title": "AI Concierge",
+    "ai_title": "BUDDY",
     "ai_desc": "Chat with an AI that knows your selected festival inside out. Ask anything.",
     "route_title": "Route Calculator",
     "route_desc": "Car and train routes with live cost estimates from your city.",
@@ -74,7 +74,7 @@
     "center": "Center"
   },
   "footer": {
-    "copyright": "© 2026 Festival Planner AI"
+    "copyright": "© 2026 LINEUP"
   },
   "tabs": {
     "logistics": "Logistics",

@@ -57,7 +57,7 @@ export const AIChat: React.FC<AIChatProps> = ({
     {
       id: 'welcome-init',
       role: 'ai',
-      content: 'Welcome to your AI Festival Concierge. Select a festival on the map to open its dedicated thread, or ask me anything about European music events.',
+      content: 'Welcome to BUDDY. Select a festival on the map to open its dedicated thread, or ask me anything about European music events.',
       timestamp: new Date(),
     },
   ]);
@@ -78,7 +78,7 @@ export const AIChat: React.FC<AIChatProps> = ({
           setMessages([{
             id: 'welcome-init',
             role: 'ai',
-            content: 'Welcome to your AI Festival Concierge. Select a festival on the map to open its dedicated thread, or ask me anything about European music events.',
+            content: 'Welcome to BUDDY. Select a festival on the map to open its dedicated thread, or ask me anything about European music events.',
             timestamp: new Date(),
           }]);
         }
@@ -108,7 +108,7 @@ export const AIChat: React.FC<AIChatProps> = ({
           setMessages([{
             id: `welcome-festival-fallback-${selectedFestival.id}`,
             role: 'ai',
-            content: `Concierge ready for ${selectedFestival.name}. How can I assist?`,
+            content: `BUDDY ready for ${selectedFestival.name}. How can I assist?`,
             timestamp: new Date(),
           }]);
         }
@@ -219,7 +219,7 @@ export const AIChat: React.FC<AIChatProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Bot size={14} style={{ color: '#10B981' }} />
           <span style={{ fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#EDEDED' }}>
-            AI Concierge
+            BUDDY
           </span>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

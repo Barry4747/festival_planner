@@ -1,4 +1,4 @@
-"""LangGraph node and tool definitions for the Festival Planner AI concierge.
+"""LangGraph node and tool definitions for the LINEUP BUDDY.
 
 Architecture boundary rule:
   - This module is ONLY responsible for natural language reasoning.
@@ -66,7 +66,7 @@ async def discover_festivals(
     genres: Optional[List[str]] = None,
 ) -> dict:
     """Search and discover music festivals via FestivalAggregator
-    (Ticketmaster API + local SQLite DB).
+    (Ticketmaster API + Supabase DB).
 
     Args:
         location_type: Granularity: 'city', 'country', or 'europe'.
@@ -179,7 +179,7 @@ async def fetch_weather_forecast(city: str, date: str) -> dict:
 
 
 async def lineup_node(state: PlannerState) -> dict:
-    """LangGraph node — AI Concierge that reads context and answers questions
+    """LangGraph node — BUDDY that reads context and answers questions
     or invokes tools for discovery, routing, and weather."""
     llm = get_llm(temperature=0.2)
     llm_with_tools = llm.bind_tools(
@@ -203,11 +203,11 @@ async def lineup_node(state: PlannerState) -> dict:
     date_range = f"{start_date} to {end_date}" if end_date else start_date
     url_line = f"Official Link: {festival_url}" if festival_url else ""
 
-    system_prompt = f"""You are an AI Festival Concierge & Travel Guide.
+    system_prompt = f"""You are an AI BUDDY & Travel Guide.
 Today is {datetime.now().strftime('%B %d, %Y')}.
 
 Your primary goals:
-1. Act as a knowledgeable concierge for {festival_name}
+1. Act as a knowledgeable BUDDY for {festival_name}
    (Location: {location}, Dates: {date_range}). {url_line}
 
 2. Logistics & Transport: When a user asks about travel, invoke `get_travel_options`
@@ -240,7 +240,7 @@ Always provide a detailed, engaging, structured markdown response."""
         user_messages = [
             HumanMessage(
                 content=(
-                    f"Please provide concierge advice, lineup highlights, and travel tips "
+                    f"Please provide BUDDY advice, lineup highlights, and travel tips "
                     f"for {festival_name} (Location: {location}, Dates: {date_range}).\n"
                     f"User preferences -> Genres: {genres_str}, Budget: {budget} PLN, "
                     f"Travelling from: {travel_from}.\n"

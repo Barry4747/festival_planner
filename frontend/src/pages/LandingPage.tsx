@@ -104,7 +104,7 @@ export const LandingPage: React.FC = () => {
         gsap.set(authSectionRef.current, {
           clipPath: 'inset(15% 15% 15% 15% round 24px)'
         });
-        
+
         gsap.to(authSectionRef.current, {
           clipPath: 'inset(0% 0% 0% 0% round 0px)',
           ease: 'power2.inOut',
@@ -135,9 +135,12 @@ export const LandingPage: React.FC = () => {
         style={{ backgroundColor: 'transparent', borderBottom: '1px solid transparent' }}
       >
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
-          <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.8rem', letterSpacing: '0.15em' }}>
-            {t('nav.title')}
-          </span>
+          <div className="flex items-center gap-2.5">
+            <img src="/logo-simple-transparent.svg" alt="LINEUP Logo" className="h-6 w-auto" />
+            <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.8rem', letterSpacing: '0.15em' }}>
+              {t('nav.title')}
+            </span>
+          </div>
           <button
             onClick={scrollToAuth}
             className="text-xs font-medium px-4 py-2 transition-colors"
@@ -156,14 +159,14 @@ export const LandingPage: React.FC = () => {
           style={{ position: 'sticky', top: 0, height: '100vh', overflow: 'hidden' }}
         >
           {/* Canvas Image Sequence Layer */}
-          <ScrollCanvas 
-            frameCount={146} 
-            urlTemplate="/frames_fast/frame_{index}.webp" 
+          <ScrollCanvas
+            frameCount={146}
+            urlTemplate="/frames_fast/frame_{index}.webp"
             onProgress={(loaded) => setLoadedFrames(loaded)}
           />
 
           {/* Loading Overlay */}
-          <div 
+          <div
             className={`absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#121212] transition-opacity duration-1000 ${isFullyLoaded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
           >
             <div className="text-center">
@@ -171,8 +174,8 @@ export const LandingPage: React.FC = () => {
                 {t('hero.loading')} [ {Math.round((loadedFrames / 146) * 100)}% ]
               </p>
               <div className="h-[2px] bg-[#2D2D2D] w-48 mx-auto overflow-hidden rounded-full">
-                <div 
-                  className="h-full bg-[#10B981] transition-all duration-300 ease-out" 
+                <div
+                  className="h-full bg-[#10B981] transition-all duration-300 ease-out"
                   style={{ width: `${(loadedFrames / 146) * 100}%` }}
                 />
               </div>
@@ -238,26 +241,26 @@ export const LandingPage: React.FC = () => {
               {t('hero.description')}
             </p>
 
-          {/* Scroll Prompt */}
-          <div
-            ref={scrollPromptRef}
-            style={{
-              position: 'absolute',
-              bottom: '40px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '12px',
-              zIndex: 20,
-            }}
+            {/* Scroll Prompt */}
+            <div
+              ref={scrollPromptRef}
+              style={{
+                position: 'absolute',
+                bottom: '40px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '12px',
+                zIndex: 20,
+              }}
             >
               <span style={{ fontSize: '0.65rem', letterSpacing: '0.15em', color: '#A1A1AA', textTransform: 'uppercase' }}>{t('hero.scroll')}</span>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-bounce">
-              <path d="M12 5v14M19 12l-7 7-7-7"/>
-            </svg>
-          </div>
+                <path d="M12 5v14M19 12l-7 7-7-7" />
+              </svg>
+            </div>
             <button
               onClick={scrollToAuth}
               className="transition-colors"
@@ -311,9 +314,12 @@ export const LandingPage: React.FC = () => {
           <p style={{ fontSize: '0.7rem', letterSpacing: '0.2em', color: '#10B981', textTransform: 'uppercase', marginBottom: '24px' }}>
             {t('features.label')}
           </p>
-          <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 3rem)', fontWeight: 700, color: '#EDEDED', marginBottom: '80px', maxWidth: '600px' }}>
-            {t('features.title')}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '80px', maxWidth: '600px' }}>
+            <img src="/logo-transparent.svg" alt="" style={{ height: 'clamp(7.5rem, 4vw, 4rem)', width: 'auto' }} />
+            <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 3rem)', fontWeight: 700, color: '#EDEDED', margin: 0 }}>
+              {t('features.title')}
+            </h2>
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1px', backgroundColor: '#2D2D2D' }}>
             {[
@@ -336,7 +342,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* ── AUTH SECTION ── */}
-      <section 
+      <section
         id="auth-section"
         ref={authSectionRef}
         className="relative min-h-[100dvh] flex flex-col items-center justify-center p-6 overflow-hidden"

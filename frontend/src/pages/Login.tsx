@@ -74,10 +74,10 @@ export const Login: React.FC = () => {
     <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-slate-100">
       <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/80 p-8 shadow-2xl backdrop-blur-xl">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600/20 text-indigo-400">
-            <Sparkles className="h-6 w-6" />
+          <div className="mx-auto mb-4 flex items-center justify-center">
+            <img src="/logo-simple-transparent.svg" alt="LINEUP Logo" className="h-16 w-16" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Festival Planner</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white">LINEUP</h1>
           <p className="mt-2 text-sm text-slate-400">
             {isSignUp ? 'Utwórz nowe konto robocze' : 'Zaloguj się do swojego planera podróży i festiwali'}
           </p>

@@ -119,7 +119,6 @@ export const DiscoverPage: React.FC = () => {
         <DiscoveryMap
           selectedFestival={selectedFestival}
           onSelectFestival={handleSelectFestival}
-          onFestivalsLoaded={() => {}}
           routeCoordinates={routeData.coordinates}
           transportData={routeData.transportData}
           activeTransportMode={transportMode}
@@ -293,7 +292,7 @@ export const DiscoverPage: React.FC = () => {
               No festival selected
             </p>
             <p style={{ fontSize: '0.8rem', color: '#A1A1AA', lineHeight: 1.6 }}>
-              Click any marker on the map to view details, chat with the AI concierge, and plan your route.
+              Click any marker on the map to view details, chat with BUDDY, and plan your route.
             </p>
           </div>
         )}

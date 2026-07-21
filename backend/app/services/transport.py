@@ -37,7 +37,7 @@ async def geocode_city(city_name: str) -> Tuple[float, float]:
 
     url = "https://nominatim.openstreetmap.org/search"
     params = {"q": city_clean, "format": "json", "limit": 1}
-    headers = {"User-Agent": "FestivalPlannerApp/1.0 (contact@festivalplanner.app)"}
+    headers = {"User-Agent": "LineupApp/1.0 (contact@lineup.app)"}
 
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
@@ -66,7 +66,7 @@ async def reverse_geocode_coords(lat: float, lon: float) -> str:
     """Reverse geocode (lat, lon) to a city/town/village name using OpenStreetMap Nominatim API."""
     url = "https://nominatim.openstreetmap.org/reverse"
     params = {"lat": lat, "lon": lon, "format": "json"}
-    headers = {"User-Agent": "FestivalPlannerApp/1.0 (contact@festivalplanner.app)"}
+    headers = {"User-Agent": "LineupApp/1.0 (contact@lineup.app)"}
 
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:

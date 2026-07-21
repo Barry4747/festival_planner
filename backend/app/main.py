@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Festival Planner API",
+    title="LINEUP API",
     version="0.1.0",
     lifespan=lifespan,
     # Disable the default 500 debug detail in production
@@ -54,7 +54,7 @@ app.include_router(trips_router, prefix="/api/trips", tags=["Trips"])
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    return {"status": "ok", "service": "Festival Planner API"}
+    return {"status": "ok", "service": "LINEUP API"}
 
 
 @app.get("/api/tiers", tags=["Config"])

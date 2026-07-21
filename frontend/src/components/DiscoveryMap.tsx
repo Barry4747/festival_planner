@@ -288,7 +288,7 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       fetchFestivals(pin.lat, pin.lng, radiusKm, startDate, endDate);
-    }, 400);
+    }, 1200);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
@@ -377,6 +377,17 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
           <div style={{ position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, display: 'flex', gap: '8px', alignItems: 'center', backgroundColor: 'rgba(127,29,29,0.95)', border: '1px solid rgba(239,68,68,0.4)', padding: '6px 12px', borderRadius: '2px', fontSize: '0.75rem', color: '#fca5a5' }}>
             <span>{error}</span>
             <button onClick={() => fetchFestivals(pin.lat, pin.lng, radiusKm, startDate, endDate)} style={{ fontWeight: 600, textDecoration: 'underline', color: '#fff', background: 'none', border: 'none', cursor: 'pointer' }}>Retry</button>
+          </div>
+        )}
+        
+        {loading && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(18, 18, 18, 0.3)', backdropFilter: 'blur(3px)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '20px 32px', backgroundColor: 'rgba(30,30,30,0.9)', borderRadius: '12px', border: '1px solid #2D2D2D', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+              <Loader2 size={32} className="animate-spin" style={{ color: '#10B981' }} />
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#10B981', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+                Scanning Area...
+              </span>
+            </div>
           </div>
         )}
 
