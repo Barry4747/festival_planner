@@ -19,6 +19,8 @@ from app.services import (
     FestivalSuggestionService,
 )
 from app.services.weather import fetch_weather
+from langgraph.errors import GraphRecursionError
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -124,7 +126,13 @@ async def plan_trip(
     _rate_limit: dict = Depends(check_rate_limit("ai_agent")),
 ):
     """Legacy plan-trip endpoint kept for backwards compatibility."""
-    return await service.generate_trip_itinerary(
-        trip_details=trip_details.model_dump(),
-        user_preferences=user_preferences.model_dump(),
-    )
+    try:
+        return await service.generate_trip_itinerary(
+            trip_details=trip_details.model_dump(),
+            user_preferences=user_preferences.model_dump(),
+        )
+    except GraphRecursionError:
+        raise HTTPException(
+            status_code=422,
+            detail="Przekroczono limit prób wywołania narzędzi przez Agenta AI. Spróbuj sformułować zapytanie inaczej."
+        )

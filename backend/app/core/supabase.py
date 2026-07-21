@@ -21,45 +21,18 @@ async def get_current_user(
     """
     token = None
 
-    # 1. Priorytetowo sprawdzamy nagłówek Authorization: Bearer <token>
-    if authorization and authorization.startswith("Bearer "):
+    # 1. Sprawdzamy czyste ciastko HttpOnly
+    if request.cookies:
+        token = request.cookies.get("access_token")
+    
+    # 2. Priorytetowo sprawdzamy nagłówek Authorization: Bearer <token> (np. przy testowaniu API z cURL)
+    if not token and authorization and authorization.startswith("Bearer "):
         token = authorization.replace("Bearer ", "").strip()
-
-    # 2. Fallback: Jeśli brak nagłówka, sprawdzamy ciasteczka (np. sb-festival-planner-auth-token z frontendu)
-    if not token and request.cookies:
-        cookie_key = "sb-festival-planner-auth-token"
-        raw_val = request.cookies.get(cookie_key)
-        
-        # Jeśli ciasteczko jest podzielone na chunki (cookie_key.0, cookie_key.1)
-        if not raw_val:
-            chunk_idx = 0
-            chunks = []
-            while True:
-                c = request.cookies.get(f"{cookie_key}.{chunk_idx}")
-                if not c:
-                    break
-                chunks.append(c)
-                chunk_idx += 1
-            if chunks:
-                raw_val = "".join(chunks)
-
-        if raw_val:
-            try:
-                decoded_json = urllib.parse.unquote(raw_val)
-                parsed = json.loads(decoded_json)
-                if isinstance(parsed, dict) and "access_token" in parsed:
-                    token = parsed["access_token"]
-                elif isinstance(parsed, str):
-                    token = parsed
-            except Exception:
-                # Jeśli raw_val nie jest JSONem, traktujemy jako czysty token lub ignorujemy
-                if len(raw_val) > 20:
-                    token = urllib.parse.unquote(raw_val)
 
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Brak nagłówka Authorization oraz aktywnych ciasteczek sesyjnych (Bearer token lub Cookie)",
+            detail="Brak nagłówka Authorization oraz aktywnych ciasteczek sesyjnych (HttpOnly)",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

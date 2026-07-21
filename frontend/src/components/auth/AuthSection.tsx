@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import { api } from '../../lib/axios';
 import { AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -46,17 +46,15 @@ export const AuthSection: React.FC<AuthSectionProps> = ({
 
     try {
       if (mode === 'signup') {
-        const { error: err } = await supabase.auth.signUp({ email, password });
-        if (err) throw err;
+        await api.post('/api/auth/signup', { email, password });
         setSuccess(t('auth.successSignup'));
         setMode('signin');
       } else {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-        if (err) throw err;
+        await api.post('/api/auth/login', { email, password });
         onSuccess?.();
       }
     } catch (err: any) {
-      setError(err.message || t('auth.errorGeneric'));
+      setError(err.response?.data?.detail || err.message || t('auth.errorGeneric'));
     } finally {
       setLoading(false);
     }
@@ -66,13 +64,16 @@ export const AuthSection: React.FC<AuthSectionProps> = ({
     setGoogleLoading(true);
     setError(null);
     try {
-      const { error: err } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo },
+      const { data } = await api.get('/api/auth/google', {
+        params: { redirect_to: redirectTo }
       });
-      if (err) throw err;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No URL returned");
+      }
     } catch (err: any) {
-      setError(err.message || t('auth.errorGoogle'));
+      setError(err.response?.data?.detail || err.message || t('auth.errorGoogle'));
       setGoogleLoading(false);
     }
   };

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { api } from '../../lib/axios';
 import { useTranslation } from 'react-i18next';
 import { LogOut, ChevronDown } from 'lucide-react';
 import gsap from 'gsap';
@@ -28,7 +28,11 @@ export const Navbar: React.FC<NavbarProps> = ({ userEmail, userAvatar, userName 
   }, []);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await api.post('/api/auth/logout');
+    } catch (e) {
+      console.error(e);
+    }
     navigate('/');
   };
 

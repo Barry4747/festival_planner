@@ -90,7 +90,7 @@ class FestivalConciergeService:
             "context": ctx
         }
         from app.agents.graph import planner_app
-        result = await planner_app.ainvoke(initial_state)
+        result = await planner_app.ainvoke(initial_state, config={"recursion_limit": 5})
         messages = result.get("messages", [])
         ai_msg = None
         for m in reversed(messages):
@@ -191,7 +191,7 @@ class FestivalConciergeService:
             "context": context
         }
         from app.agents.graph import planner_app
-        result = await planner_app.ainvoke(initial_state)
+        result = await planner_app.ainvoke(initial_state, config={"recursion_limit": 5})
         messages = result.get("messages", [])
         ai_msg = None
         for m in reversed(messages):

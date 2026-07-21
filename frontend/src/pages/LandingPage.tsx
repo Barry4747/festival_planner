@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { supabase } from '../lib/supabase';
+import { api } from '../lib/axios';
 import { AuthSection } from '../components/auth/AuthSection';
 import { ScrollCanvas } from '../components/ScrollCanvas';
 import { useTranslation } from 'react-i18next';
@@ -38,13 +38,13 @@ export const LandingPage: React.FC = () => {
 
   // Redirect if already logged in
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate('/discover');
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) navigate('/discover');
-    });
-    return () => subscription.unsubscribe();
+    api.get('/api/me')
+      .then(() => {
+        navigate('/discover');
+      })
+      .catch(() => {
+        // Not logged in, stay on landing page
+      });
   }, [navigate]);
 
   // Navbar transparency on scroll

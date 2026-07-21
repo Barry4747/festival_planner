@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import chat_router, planner_router, transport_router, trips_router
+from app.api.routers import chat_router, planner_router, transport_router, trips_router, auth_router
 from app.core.config import settings
 from app.core.rate_limit import RateLimitException, rate_limit_exception_handler
 from app.core.supabase import get_current_user
@@ -50,6 +50,7 @@ app.include_router(planner_router, prefix="/api", tags=["Planner"])
 app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
 app.include_router(transport_router, prefix="/api/transport", tags=["Transport"])
 app.include_router(trips_router, prefix="/api/trips", tags=["Trips"])
+app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 
 
 @app.get("/health", tags=["Health"])

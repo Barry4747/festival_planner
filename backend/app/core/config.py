@@ -1,4 +1,5 @@
-from typing import List, Optional
+from typing import List, Optional, Union
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -8,7 +9,17 @@ class Settings(BaseSettings):
 
     # CORS — comma-separated list of allowed origins, e.g.:
     # ALLOWED_ORIGINS=http://localhost:5173,https://yourapp.com
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:5173"]
+    ALLOWED_ORIGINS: Union[str, List[str]] = ["http://localhost:5173"]
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str) and not v.startswith("["):
+            return [i.strip() for i in v.split(",") if i.strip()]
+        elif isinstance(v, str):
+            import json
+            return json.loads(v)
+        return v
 
     SUPABASE_URL: str
     SUPABASE_KEY: str
@@ -41,5 +52,17 @@ class Settings(BaseSettings):
     GOOGLE_CALENDAR_CLIENT_SECRET: Optional[str] = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    @model_validator(mode="after")
+    def validate_production_settings(self):
+        if self.ENVIRONMENT == "production":
+            # Fail-fast for missing ALLOWED_ORIGINS in production
+            if not self.ALLOWED_ORIGINS or "http://localhost:5173" in self.ALLOWED_ORIGINS:
+                raise ValueError("ALLOWED_ORIGINS musi być ustawione dla środowiska produkcyjnego (i nie może to być localhost)")
+            
+            # Fail-fast for other critical services as per code review
+            if not self.TICKETMASTER_API_KEY:
+                raise ValueError("TICKETMASTER_API_KEY jest wymagane w środowisku produkcyjnym")
+        return self
 
 settings = Settings()

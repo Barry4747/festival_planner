@@ -249,8 +249,17 @@ Start Date: {start_date}
             )
         ]
 
+    from langchain_core.messages import AIMessage
+    
     messages = [SystemMessage(content=system_prompt), user_context_message] + user_messages
-    llm_response = await llm_with_tools.ainvoke(messages)
+    try:
+        llm_response = await asyncio.wait_for(llm_with_tools.ainvoke(messages), timeout=15.0)
+    except asyncio.TimeoutError as e:
+        logger.error("lineup_node: Timeout (15s) while invoking LLM: %s", e, exc_info=True)
+        llm_response = AIMessage(content="AI aktualnie przeciążone, spróbuj ponownie za chwilę.")
+    except Exception as e:
+        logger.error("lineup_node: Error invoking LLM (e.g. rate limit, downtime): %s", e, exc_info=True)
+        llm_response = AIMessage(content="AI aktualnie przeciążone, spróbuj ponownie za chwilę.")
 
     if hasattr(llm_response, "tool_calls") and llm_response.tool_calls:
         logger.info("lineup_node: AI requested tools: %s", [tc["name"] for tc in llm_response.tool_calls])

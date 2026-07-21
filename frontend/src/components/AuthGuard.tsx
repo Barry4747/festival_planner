@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import type { Session } from '@supabase/supabase-js';
+import { api } from '../lib/axios';
 
 interface AuthGuardProps {
   children?: React.ReactNode;
@@ -10,90 +9,41 @@ interface AuthGuardProps {
 
 /**
  * Komponent chroniący ścieżki (Route Guard).
- * Sprawdza obecność aktywnej sesji w Supabase. Jeśli użytkownik jest niezalogowany, przekierowuje na `redirectTo` (domyślnie /login).
+ * Sprawdza obecność aktywnej sesji przez API backendu (HttpOnly cookies). 
+ * Jeśli użytkownik jest niezalogowany, przekierowuje na `redirectTo` (domyślnie /login).
  * Obsługuje zarówno zagnieżdżone routingi (<Outlet />) jak i przekazywanie jako children.
  */
 export const AuthGuard: React.FC<AuthGuardProps> = ({ 
   children, 
   redirectTo = '/login' 
 }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const location = useLocation();
 
   useEffect(() => {
     let isMounted = true;
 
-    // 1. Pobranie początkowego stanu sesji oraz proaktywne odświeżenie jeśli wygasa
-    const fetchSession = async () => {
+    const verifySession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('❌ Błąd pobierania sesji w AuthGuard:', error);
-        }
-
-        if (session && isMounted) {
-          const now = Math.round(Date.now() / 1000);
-          // Jeśli token wygasa za mniej niż 3 minuty, natychmiast odświeżamy sesję
-          if (session.expires_at && session.expires_at <= now + 180) {
-            console.info('🔄 [AuthGuard] Token bliski wygaśnięcia podczas wejścia na stronę. Odświeżam sesję...');
-            const { data: refreshedData } = await supabase.auth.refreshSession();
-            if (refreshedData.session && isMounted) {
-              setSession(refreshedData.session);
-              setLoading(false);
-              return;
-            }
-          }
-        }
-
+        await api.get('/api/me');
         if (isMounted) {
-          setSession(session);
+          setIsAuthenticated(true);
         }
       } catch (err) {
-        console.error('❌ Wyjątek AuthGuard fetchSession:', err);
-      } finally {
         if (isMounted) {
-          setLoading(false);
+          setIsAuthenticated(false);
         }
       }
     };
 
-    fetchSession();
-
-    // 2. Nasłuchiwanie na zmiany (np. zalogowanie w innej karcie lub wygaśnięcie tokenu)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, currentSession) => {
-        if (isMounted) {
-          setSession(currentSession);
-          setLoading(false);
-        }
-      }
-    );
-
-    // 3. Okresowy strażnik sesji (zabezpiecza przed wygaśnięciem przy długim otwarciu karty)
-    const refreshInterval = setInterval(async () => {
-      try {
-        const { data: { session: current } } = await supabase.auth.getSession();
-        if (current) {
-          const now = Math.round(Date.now() / 1000);
-          if (current.expires_at && current.expires_at <= now + 300) {
-            console.info('🔄 [AuthGuard Strażnik] Odświeżam sesję w tle przed upływem ważności...');
-            await supabase.auth.refreshSession();
-          }
-        }
-      } catch (e) {
-        console.warn('⚠️ Błąd okresowego odświeżania sesji w tle:', e);
-      }
-    }, 3 * 60 * 1000); // Sprawdzenie co 3 minuty
+    verifySession();
 
     return () => {
       isMounted = false;
-      clearInterval(refreshInterval);
-      subscription.unsubscribe();
     };
   }, []);
 
-  if (loading) {
+  if (isAuthenticated === null) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-[#090b0a]">
         <div className="flex flex-col items-center gap-4">
@@ -106,7 +56,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
     );
   }
 
-  if (!session) {
+  if (!isAuthenticated) {
     // Przekierowanie z zapamiętaniem ścieżki docelowej
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }

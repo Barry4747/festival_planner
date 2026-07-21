@@ -11,6 +11,7 @@ from app.services import (
     FestivalSuggestionService,
     FestivalDiscoveryService,
     FestivalConciergeService,
+    AuthService,
 )
 
 
@@ -56,3 +57,8 @@ def get_concierge_service(
 ) -> FestivalConciergeService:
     """FastAPI DI provider for FestivalConciergeService."""
     return FestivalConciergeService(repository)
+
+
+def get_auth_service(client: Client = Depends(get_supabase_client)) -> AuthService:
+    """FastAPI DI provider for AuthService."""
+    return AuthService(client)

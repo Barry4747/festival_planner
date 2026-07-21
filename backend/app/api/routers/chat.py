@@ -9,6 +9,7 @@ from app.core.supabase import get_current_user
 from app.dependencies import get_concierge_service
 from app.schemas.chat import FestivalChatRequest
 from app.services import FestivalConciergeService
+from langgraph.errors import GraphRecursionError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -51,11 +52,17 @@ async def chat_endpoint(
     and DB message persistence. Requires JWT authentication.
     """
     user_id = _get_user_id(user)
-    return await service.generate_chat_response(
-        message=request.message,
-        festival_id=request.festival_id,
-        festival_context=request.festival_context,
-        context=request.context,
-        history=request.history,
-        user_id=user_id,
-    )
+    try:
+        return await service.generate_chat_response(
+            message=request.message,
+            festival_id=request.festival_id,
+            festival_context=request.festival_context,
+            context=request.context,
+            history=request.history,
+            user_id=user_id,
+        )
+    except GraphRecursionError:
+        raise HTTPException(
+            status_code=422,
+            detail="Przekroczono limit prób wywołania narzędzi przez Agenta AI. Spróbuj sformułować zapytanie inaczej."
+        )
