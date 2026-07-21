@@ -12,8 +12,9 @@ class FestivalRepository:
     concerning festivals (`local_festivals`) and user suggestions (`festival_suggestions`).
     """
 
-    def __init__(self, client: Client):
+    def __init__(self, client: Client, service_client: Optional[Client] = None):
         self.client = client
+        self.service_client = service_client
 
     def _sync_save_suggestion(
         self,
@@ -170,7 +171,11 @@ class FestivalRepository:
         self, thread_id: str, role: str, content: str
     ) -> Dict[str, Any]:
         payload = {"thread_id": str(thread_id), "role": role, "content": content}
-        response = self.client.table("chat_messages").insert(payload).execute()
+        
+        # Use service_role client to bypass RLS when inserting assistant messages
+        client_to_use = self.service_client if role == "assistant" and self.service_client else self.client
+        
+        response = client_to_use.table("chat_messages").insert(payload).execute()
         rows = (
             response.data
             if response and hasattr(response, "data") and isinstance(response.data, list) and len(response.data) > 0

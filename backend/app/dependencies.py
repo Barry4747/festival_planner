@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional
 from fastapi import Depends
 from supabase import Client
-from app.db.database import get_supabase_client
+from app.db.database import get_supabase_client, get_service_supabase_client
 from app.core.supabase import get_current_user
 from app.repositories import FestivalRepository
 from app.services import (
@@ -48,8 +48,16 @@ def get_authenticated_supabase_client(user: Dict[str, Any] = Depends(get_current
     return client
 
 
-def get_authenticated_festival_repository(client: Client = Depends(get_authenticated_supabase_client)) -> FestivalRepository:
-    return FestivalRepository(client)
+def get_authenticated_festival_repository(
+    authenticated_client: Client = Depends(get_authenticated_supabase_client),
+    service_client: Client = Depends(get_service_supabase_client),
+) -> FestivalRepository:
+    """
+    Returns an instance of FestivalRepository configured with an authenticated
+    Supabase client scoped to the current user's session.
+    Also injects the service_client for administrative operations like saving AI messages.
+    """
+    return FestivalRepository(client=authenticated_client, service_client=service_client)
 
 
 def get_concierge_service(
