@@ -51,7 +51,7 @@ export const AIChat: React.FC<AIChatProps> = ({
 }) => {
   const setDepartureCity = usePlannerStore((state) => state.setDepartureCity);
   const setRouteData = usePlannerStore((state) => state.setRouteData);
-  const setActiveRouteCoords = usePlannerStore((state) => state.setActiveRouteCoords);
+  const setActiveRouteSteps = usePlannerStore((state) => state.setActiveRouteSteps);
   const setWeatherForecast = usePlannerStore((state) => state.setWeatherForecast);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {

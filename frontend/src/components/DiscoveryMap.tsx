@@ -138,15 +138,6 @@ import type { TransportRoutesData, RouteStep } from './LogisticsPanel';
 
 export type FestivalItem = Festival;
 
-const TrainStationPinIcon = new L.DivIcon({
-  html: `<div style="background-color: #3b82f6; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.5); border: 2px solid #ffffff;">
-           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="16" rx="2" ry="2"></rect><path d="M4 11h16"></path><path d="M12 3v8"></path><path d="M8 19l-2 3"></path><path d="M18 22l-2-3"></path><path d="M8 15h0"></path><path d="M16 15h0"></path></svg>
-         </div>`,
-  className: '',
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
-});
-
 interface DiscoveryMapProps {
   selectedFestival: FestivalItem | null;
   onSelectFestival: (festival: FestivalItem | null) => void;
@@ -198,7 +189,7 @@ export const DiscoveryMap: React.FC<DiscoveryMapProps> = ({
 
   const activeTab = usePlannerStore((state) => state.activeTab);
   const weatherLayer = usePlannerStore((state) => state.weatherLayer);
-  const setWeatherLayer = usePlannerStore((state) => state.setWeatherLayer);
+
   const routeData = usePlannerStore((state) => state.routeData);
   const activeRouteSteps = usePlannerStore((state) => state.activeRouteSteps);
 

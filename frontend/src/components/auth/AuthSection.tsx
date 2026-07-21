@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Mail, Lock, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
-import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
+import { AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface AuthSectionProps {

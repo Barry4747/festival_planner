@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { api } from '../lib/axios';
 import { LocationAutocomplete } from './LocationAutocomplete';
 import type { FestivalItem } from './DiscoveryMap';
-import { Car, Train, Navigation, Loader2, MapPin, Clock, Fuel, ArrowRight, Check, LocateFixed } from 'lucide-react';
+import { Car, Train, Navigation, Loader2, MapPin, Clock, Fuel, LocateFixed } from 'lucide-react';
 import { usePlannerStore } from '../store/usePlannerStore';
 import { useGeolocation } from '../utils/useGeolocation';
 
@@ -46,6 +46,11 @@ export interface TransportRoutesData {
     steps?: RouteStep[];
     status?: string;
     message?: string;
+    itineraries?: any[];
+    origin_name?: string;
+    origin_coords?: [number, number];
+    dest_name?: string;
+    dest_coords?: [number, number];
   };
 }
 
@@ -72,7 +77,6 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
     setRouteData,
     transportMode: activeTransportMode,
     setTransportMode: onActiveTransportModeChange,
-    selectedTrainIndex,
     setSelectedTrainIndex: onSelectedTrainIndexChange,
   } = usePlannerStore();
   
@@ -97,7 +101,7 @@ export const LogisticsPanel: React.FC<LogisticsPanelProps> = ({ selectedFestival
           dest_lat: selectedFestival.lat,
           dest_lng: selectedFestival.lng,
           date: selectedFestival.start_date || selectedFestival.dates || '2026-07-20',
-          dest_name: selectedFestival.city || selectedFestival.name.split('|')[0].replace('Festival', '').strip(),
+          dest_name: selectedFestival.city || selectedFestival.name.split('|')[0].replace('Festival', '').trim(),
         },
       });
       if (response.data) {

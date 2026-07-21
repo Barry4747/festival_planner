@@ -1,0 +1,40 @@
+services:
+  redis:
+    image: redis:alpine
+    container_name: lineup-redis-prod
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data_prod:/data
+    restart: always
+    # Redisa nie wystawiamy na świat, używamy w sieci wewnętrznej dockera
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: lineup-backend-prod
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env.prod
+    depends_on:
+      - redis
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: lineup-frontend-prod
+    ports:
+      - "80:80"
+    env_file:
+      - ./frontend/.env.prod
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  redis_data_prod:
