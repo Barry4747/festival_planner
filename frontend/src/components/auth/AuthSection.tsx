@@ -80,22 +80,20 @@ export const AuthSection: React.FC<AuthSectionProps> = ({
         <button
           type="button"
           onClick={() => { setMode('signup'); setError(null); setSuccess(null); }}
-          className={`flex-1 py-2 text-sm font-medium transition-all duration-200 rounded-md ${
-            mode === 'signup'
+          className={`flex-1 py-2 text-sm font-medium transition-all duration-200 rounded-md ${mode === 'signup'
               ? 'bg-zinc-800 text-white shadow'
               : 'text-zinc-400 hover:text-zinc-200'
-          }`}
+            }`}
         >
           {t('auth.signup')}
         </button>
         <button
           type="button"
           onClick={() => { setMode('signin'); setError(null); setSuccess(null); }}
-          className={`flex-1 py-2 text-sm font-medium transition-all duration-200 rounded-md ${
-            mode === 'signin'
+          className={`flex-1 py-2 text-sm font-medium transition-all duration-200 rounded-md ${mode === 'signin'
               ? 'bg-zinc-800 text-white shadow'
               : 'text-zinc-400 hover:text-zinc-200'
-          }`}
+            }`}
         >
           {t('auth.signin')}
         </button>

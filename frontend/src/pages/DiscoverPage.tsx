@@ -11,8 +11,6 @@ import { usePlannerStore } from '../store/usePlannerStore';
 import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
 
-
-
 export const DiscoverPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedFestival, setSelectedFestival] = useState<FestivalItem | null>(null);
@@ -20,6 +18,11 @@ export const DiscoverPage: React.FC = () => {
   const [savingTripId, setSavingTripId] = useState<string | null>(null);
   const { routeData, transportMode, selectedTrainIndex, activeTab, setActiveTab } = usePlannerStore();
   const { t } = useTranslation();
+
+  // Mobile Bottom Sheet states
+  const [mapFestivals, setMapFestivals] = useState<FestivalItem[]>([]);
+  const [isListView, setIsListView] = useState(false);
+  const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(false);
 
   const mapRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -29,7 +32,8 @@ export const DiscoverPage: React.FC = () => {
     if (mapRef.current) {
       tl.fromTo(mapRef.current, { scale: 0.97, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.0 }, 0.3);
     }
-    if (panelRef.current) {
+    // Fade in panel only on desktop initially
+    if (panelRef.current && window.innerWidth >= 768) {
       tl.fromTo(panelRef.current, { x: 30, opacity: 0 }, { x: 0, opacity: 1, duration: 0.9 }, 0.45);
     }
   }, []);
@@ -41,12 +45,11 @@ export const DiscoverPage: React.FC = () => {
     { id: 'weather', label: t('tabs.weather') },
   ];
 
-  // Fetch saved trips
   const fetchSavedTrips = useCallback(async () => {
     try {
       const res = await api.get('/api/trips');
       if (res.data) setSavedTrips(res.data.map((row: any) => row.festival_data));
-    } catch { /* not logged in yet */ }
+    } catch { /* not logged in */ }
   }, []);
 
   useEffect(() => {
@@ -55,7 +58,6 @@ export const DiscoverPage: React.FC = () => {
     });
   }, [fetchSavedTrips]);
 
-  // URL param: auto-select from My Trips
   useEffect(() => {
     const festivalId = searchParams.get('festival_id');
     if (festivalId && savedTrips.length > 0 && !selectedFestival) {
@@ -63,6 +65,8 @@ export const DiscoverPage: React.FC = () => {
       if (festival) {
         setSelectedFestival(festival);
         setActiveTab('chat');
+        setIsBottomSheetExpanded(true);
+        setIsListView(false);
         setSearchParams({}, { replace: true });
       }
     }
@@ -71,7 +75,13 @@ export const DiscoverPage: React.FC = () => {
   const handleSelectFestival = (festival: FestivalItem | null) => {
     setSelectedFestival(festival);
     usePlannerStore.getState().setRouteData({ coordinates: null, transportData: null });
-    if (festival) setActiveTab('chat');
+    if (festival) {
+      setActiveTab('chat');
+      setIsBottomSheetExpanded(true);
+      setIsListView(false);
+    } else {
+      setIsBottomSheetExpanded(false);
+    }
   };
 
   const handleToggleSavedTrip = async (festival: FestivalItem) => {
@@ -105,20 +115,17 @@ export const DiscoverPage: React.FC = () => {
     || null;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        height: '100dvh',
-        overflow: 'hidden',
-        paddingTop: '56px', // Navbar height
-        backgroundColor: '#121212',
-      }}
-    >
-      {/* ── LEFT: MAP (65%) ── */}
-      <div ref={mapRef} style={{ flex: '0 0 65%', position: 'relative', overflow: 'hidden', opacity: 0 }}>
+    <div className="flex flex-col md:flex-row h-[100dvh] pt-[56px] bg-[#121212] overflow-hidden relative">
+      
+      {/* ── LEFT: MAP (100% Mobile, 65% Desktop) ── */}
+      <div 
+        ref={mapRef} 
+        className="absolute inset-0 md:relative w-full h-[100dvh] md:h-full md:flex-[0_0_65%] z-0"
+      >
         <DiscoveryMap
           selectedFestival={selectedFestival}
           onSelectFestival={handleSelectFestival}
+          onFestivalsLoaded={setMapFestivals}
           routeCoordinates={routeData.coordinates}
           transportData={routeData.transportData}
           activeTransportMode={transportMode}
@@ -127,57 +134,108 @@ export const DiscoverPage: React.FC = () => {
           onToggleSavedTrip={handleToggleSavedTrip}
           originCoords={originCoords as [number, number] | null}
         />
+
+        {/* ── MOBILE VIEW TOGGLE ── */}
+        {!selectedFestival && (
+          <div className="md:hidden absolute bottom-[100px] left-1/2 -translate-x-1/2 z-20 transition-all">
+            <div className="flex bg-zinc-900/90 backdrop-blur border border-zinc-700/50 p-1.5 rounded-full shadow-2xl">
+              <button
+                onClick={() => { setIsListView(false); setIsBottomSheetExpanded(false); }}
+                className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors ${!isListView ? 'bg-emerald-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
+              >
+                🗺️ Mapa
+              </button>
+              <button
+                onClick={() => { setIsListView(true); setIsBottomSheetExpanded(true); }}
+                className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors ${isListView ? 'bg-emerald-500 text-black shadow-md' : 'text-zinc-400 hover:text-white'}`}
+              >
+                📋 Lista
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── RIGHT PANEL (35%) ── */}
+      {/* ── RIGHT PANEL / MOBILE BOTTOM SHEET (35% Desktop, Dynamic Mobile) ── */}
       <div
         ref={panelRef}
-        style={{
-          flex: '0 0 35%',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: '#1E1E1E',
-          borderLeft: '1px solid #2D2D2D',
-          overflow: 'hidden',
-          opacity: 0,
-        }}
+        className={`
+          absolute md:relative z-10 md:z-auto
+          bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-auto
+          w-full md:flex-[0_0_35%] md:h-full
+          bg-[#1E1E1E] md:border-l border-[#2D2D2D]
+          flex flex-col overflow-hidden
+          transition-all duration-400 ease-[cubic-bezier(0.32,0.72,0,1)]
+          rounded-t-3xl md:rounded-none shadow-[0_-10px_40px_rgba(0,0,0,0.6)] md:shadow-none
+          ${!selectedFestival && !isListView 
+            ? 'translate-y-full md:translate-y-0 h-0 md:h-full opacity-0 md:opacity-100' 
+            : 'translate-y-0 opacity-100'}
+          ${(selectedFestival || isListView) 
+            ? (isBottomSheetExpanded ? 'h-[88dvh] md:h-full' : 'h-[30dvh] md:h-full') 
+            : ''}
+        `}
       >
-        {selectedFestival ? (
+        {/* Mobile Drag Handle */}
+        <div 
+          className="md:hidden w-full flex flex-col justify-center items-center h-10 cursor-pointer shrink-0 border-b border-[#2D2D2D]/50 hover:bg-zinc-800/30 transition-colors"
+          onClick={() => setIsBottomSheetExpanded(!isBottomSheetExpanded)}
+        >
+          <div className="w-12 h-1.5 bg-zinc-600 rounded-full" />
+        </div>
+
+        {/* --- STATE: LIST VIEW --- */}
+        {isListView && !selectedFestival ? (
+          <div className="flex-1 overflow-y-auto no-scrollbar p-4 flex flex-col gap-3 pb-safe">
+            <h3 className="text-lg font-bold text-white mb-2 px-1">Znalezione Festiwale ({mapFestivals.length})</h3>
+            {mapFestivals.map(fest => (
+              <div 
+                key={fest.id} 
+                onClick={() => handleSelectFestival(fest)}
+                className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 flex gap-4 cursor-pointer hover:border-emerald-500/50 transition-all active:scale-[0.98]"
+              >
+                {fest.image && (
+                  <img src={fest.image} alt={fest.name} className="w-20 h-20 object-cover rounded-lg shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-white font-semibold truncate">{fest.name}</h4>
+                  <p className="text-sm text-zinc-400 truncate">{fest.city} • {fest.start_date}</p>
+                  <p className="text-xs text-emerald-400 mt-2 font-medium">{fest.category || fest.genre}</p>
+                </div>
+              </div>
+            ))}
+            {mapFestivals.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-40 text-zinc-500">
+                <p>Brak wyników w tym obszarze.</p>
+              </div>
+            )}
+          </div>
+        ) : selectedFestival ? (
+          /* --- STATE: SELECTED FESTIVAL --- */
           <>
             {/* Festival name strip */}
-            <div
-              style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid #2D2D2D',
-                display: 'flex',
-                alignItems: 'flex-start',
-                justifyContent: 'space-between',
-                gap: '12px',
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <p style={{ fontSize: '0.65rem', color: '#A1A1AA', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '4px' }}>
+            <div className="px-5 py-4 border-b border-[#2D2D2D] flex items-start justify-between gap-3 shrink-0">
+              <div className="min-w-0">
+                <p className="text-[0.65rem] text-zinc-400 tracking-[0.1em] uppercase mb-1">
                   Selected Festival
                 </p>
-                <h2 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#EDEDED', margin: 0, lineHeight: 1.3 }}>
+                <h2 className="text-[0.95rem] font-semibold text-zinc-100 m-0 leading-snug truncate">
                   {selectedFestival.name}
                 </h2>
                 {(selectedFestival.city || selectedFestival.start_date) && (
-                  <p style={{ fontSize: '0.75rem', color: '#A1A1AA', marginTop: '4px' }}>
+                  <p className="text-xs text-zinc-400 mt-1 truncate">
                     {[selectedFestival.city, selectedFestival.start_date].filter(Boolean).join(' · ')}
                   </p>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => handleToggleSavedTrip(selectedFestival)}
                   disabled={savingTripId === String(selectedFestival.id)}
                   title={isSaved ? 'Remove from My Trips' : 'Save to My Trips'}
-                  className="transition-colors flex-shrink-0"
-                  style={{ color: isSaved ? '#10B981' : '#A1A1AA', padding: '4px', background: 'none', border: 'none', cursor: savingTripId === String(selectedFestival.id) ? 'not-allowed' : 'pointer', opacity: savingTripId === String(selectedFestival.id) ? 0.7 : 1 }}
+                  className={`p-1.5 rounded-lg transition-all ${isSaved ? 'text-emerald-500 bg-emerald-500/10' : 'text-zinc-400 hover:bg-zinc-800'}`}
                 >
                   {savingTripId === String(selectedFestival.id) ? (
-                    <Loader2 size={18} className="animate-spin text-[#10B981]" />
+                    <Loader2 size={18} className="animate-spin text-emerald-500" />
                   ) : isSaved ? (
                     <BookmarkCheck size={18} />
                   ) : (
@@ -187,8 +245,7 @@ export const DiscoverPage: React.FC = () => {
                 <button
                   onClick={() => handleSelectFestival(null)}
                   title="Close panel"
-                  className="transition-colors flex-shrink-0 hover:text-white"
-                  style={{ color: '#A1A1AA', padding: '4px', background: 'none', border: 'none', cursor: 'pointer' }}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all"
                 >
                   <X size={20} />
                 </button>
@@ -196,47 +253,16 @@ export const DiscoverPage: React.FC = () => {
             </div>
 
             {/* Tab bar */}
-            <div
-              style={{
-                display: 'flex',
-                borderBottom: '1px solid #2D2D2D',
-                padding: '0 20px',
-              }}
-            >
+            <div className="flex border-b border-[#2D2D2D] px-5 overflow-x-auto no-scrollbar shrink-0">
             {TAB_LABELS.map(({ id, label }) => (
                 <button
                   key={id}
-                  onClick={() => setActiveTab(id)}
-                  style={{
-                    flex: 1,
-                    padding: '10px 0',
-                    fontSize: '0.7rem',
-                    fontWeight: 600,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase' as const,
-                    color: activeTab === id ? '#10B981' : '#A1A1AA',
-                    background: activeTab === id ? 'rgba(16,185,129,0.06)' : 'none',
-                    borderTop: 'none',
-                    borderLeft: 'none',
-                    borderRight: 'none',
-                    borderBottom: activeTab === id ? '2px solid #10B981' : '2px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.25s ease',
-                    outline: 'none',
-                    textShadow: activeTab === id ? '0 0 12px rgba(16,185,129,0.5)' : 'none',
-                  }}
-                  onMouseEnter={e => {
-                    if (activeTab !== id) {
-                      (e.currentTarget as HTMLButtonElement).style.color = '#EDEDED';
-                      (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.03)';
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (activeTab !== id) {
-                      (e.currentTarget as HTMLButtonElement).style.color = '#A1A1AA';
-                      (e.currentTarget as HTMLButtonElement).style.background = 'none';
-                    }
-                  }}
+                  onClick={() => { setActiveTab(id); setIsBottomSheetExpanded(true); }}
+                  className={`flex-1 min-w-[70px] py-3 text-[0.7rem] font-semibold tracking-wider uppercase transition-all outline-none whitespace-nowrap
+                    ${activeTab === id 
+                      ? 'text-emerald-500 border-b-2 border-emerald-500 bg-emerald-500/5 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]' 
+                      : 'text-zinc-400 border-b-2 border-transparent hover:text-zinc-200 hover:bg-white/5'}
+                  `}
                 >
                   {label}
                 </button>
@@ -244,7 +270,7 @@ export const DiscoverPage: React.FC = () => {
             </div>
 
             {/* Tab content */}
-            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div className="flex-1 overflow-hidden flex flex-col pb-safe">
               {activeTab === 'chat' && (
                 <AIChat
                   selectedFestival={selectedFestival}
@@ -262,36 +288,15 @@ export const DiscoverPage: React.FC = () => {
             </div>
           </>
         ) : (
-          /* No festival selected */
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '40px 24px',
-              textAlign: 'center',
-            }}
-          >
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                border: '1px solid #2D2D2D',
-                borderRadius: '2px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '20px',
-              }}
-            >
-              <MapPin size={20} style={{ color: '#A1A1AA' }} />
+          /* --- STATE: DESKTOP EMPTY (Hidden on mobile) --- */
+          <div className="hidden md:flex flex-1 flex-col items-center justify-center p-10 text-center">
+            <div className="w-12 h-12 border border-[#2D2D2D] rounded-lg flex items-center justify-center mb-5">
+              <MapPin size={20} className="text-zinc-500" />
             </div>
-            <p style={{ fontSize: '0.9rem', fontWeight: 500, color: '#EDEDED', marginBottom: '8px' }}>
+            <p className="text-[0.9rem] font-medium text-zinc-200 mb-2">
               No festival selected
             </p>
-            <p style={{ fontSize: '0.8rem', color: '#A1A1AA', lineHeight: 1.6 }}>
+            <p className="text-[0.8rem] text-zinc-500 leading-relaxed max-w-[250px]">
               Click any marker on the map to view details, chat with BUDDY, and plan your route.
             </p>
           </div>
@@ -305,14 +310,14 @@ export const DiscoverPage: React.FC = () => {
 const DetailsPanel: React.FC<{ festival: FestivalItem }> = ({ festival }) => {
   const imgUrl = festival.image_url || festival.image;
   return (
-    <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+    <div className="flex-1 overflow-y-auto p-5 no-scrollbar">
       {imgUrl && (
-        <div style={{ marginBottom: '20px', overflow: 'hidden', borderRadius: '2px', border: '1px solid #2D2D2D' }}>
-          <img src={imgUrl} alt={festival.name} style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} />
+        <div className="mb-5 overflow-hidden rounded-xl border border-[#2D2D2D]">
+          <img src={imgUrl} alt={festival.name} className="w-full h-40 object-cover block" />
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="flex flex-col gap-4">
         {festival.city && (
           <Row icon={<MapPin size={14} />} label="Location" value={festival.city} />
         )}
@@ -327,15 +332,7 @@ const DetailsPanel: React.FC<{ festival: FestivalItem }> = ({ festival }) => {
             href={festival.url}
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.8rem',
-              color: '#10B981',
-              textDecoration: 'none',
-              marginTop: '4px',
-            }}
+            className="inline-flex items-center gap-1.5 text-xs text-emerald-500 hover:text-emerald-400 transition-colors mt-2"
           >
             Official website <ExternalLink size={12} />
           </a>
@@ -346,13 +343,11 @@ const DetailsPanel: React.FC<{ festival: FestivalItem }> = ({ festival }) => {
 };
 
 const Row: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
-  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-    <span style={{ color: '#A1A1AA', marginTop: '1px', flexShrink: 0 }}>{icon}</span>
+  <div className="flex gap-3 items-start">
+    <span className="text-zinc-500 mt-0.5 shrink-0">{icon}</span>
     <div>
-      <p style={{ fontSize: '0.65rem', color: '#A1A1AA', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '3px' }}>
-        {label}
-      </p>
-      <p style={{ fontSize: '0.875rem', color: '#EDEDED' }}>{value}</p>
+      <p className="text-[0.65rem] text-zinc-500 tracking-wider uppercase mb-1">{label}</p>
+      <p className="text-sm text-zinc-200">{value}</p>
     </div>
   </div>
 );
