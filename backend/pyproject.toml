@@ -11,8 +11,22 @@ dependencies = [
     "httpx>=0.28.1",
     "langchain-google-genai>=4.2.7",
     "langgraph>=1.2.9",
+    "levenshtein>=0.27.3",
     "pydantic-settings>=2.14.2",
+    "pyhafas>=0.4.0",
     "redis>=8.0.1",
     "supabase>=2.31.0",
+    "thefuzz>=0.22.1",
     "uvicorn>=0.51.0",
+    "polyline>=2.0.2",
+    "email-validator>=2.3.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-mock>=3.14.0",
+    "fakeredis>=2.27.0",
+    "respx>=0.22.0",
 ]

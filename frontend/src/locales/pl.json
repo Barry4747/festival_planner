@@ -1,0 +1,96 @@
+{
+  "nav": {
+    "logo": "Planer Festiwali",
+    "title": "PLANER FESTIWALI",
+    "get_access": "Uzyskaj Dostęp",
+    "discover": "Odkrywaj",
+    "myTrips": "Moje Wycieczki",
+    "signedIn": "Zalogowano jako",
+    "signOut": "Wyloguj się"
+  },
+  "hero": {
+    "loading": "ŁADOWANIE",
+    "subtitle": "Inteligentne Odkrywanie Festiwali",
+    "title_start": "Odkryj Swój ",
+    "title_accent": "Kolejny",
+    "title_end": " Festiwal",
+    "description": "Planowanie dzięki AI. Trasy w czasie rzeczywistym. Wyselekcjonowane wydarzenia w Europie.",
+    "button": "Zacznij Planować",
+    "scroll": "Przewiń"
+  },
+  "features": {
+    "label": "Platforma",
+    "title": "Wszystkie potrzebne narzędzia w jednym miejscu.",
+    "map_title": "Interaktywna Mapa",
+    "map_desc": "Odkrywaj festiwale na żywo w całej Europie. Kliknij dowolną pinezkę, aby rozpocząć planowanie.",
+    "ai_title": "Konsjerż AI",
+    "ai_desc": "Porozmawiaj z AI, które zna wybrany przez Ciebie festiwal na wylot. Zapytaj o cokolwiek.",
+    "route_title": "Kalkulator Tras",
+    "route_desc": "Trasy samochodowe i kolejowe z bieżącymi szacunkami kosztów z Twojego miasta.",
+    "trips_title": "Moje Wycieczki",
+    "trips_desc": "Zapisuj festiwale i plany, aby powrócić do nich tam, gdzie skończyłeś."
+  },
+  "auth": {
+    "label": "Dostęp",
+    "title": "Utwórz konto",
+    "signup": "Załóż konto",
+    "signin": "Zaloguj się",
+    "redirecting": "Przekierowanie...",
+    "google": "Kontynuuj z Google",
+    "orEmail": "lub e-mail",
+    "emailLabel": "Adres e-mail",
+    "passwordLabel": "Hasło",
+    "emailPlaceholder": "festiwalowicz@rave.com",
+    "submitSignup": "Utwórz konto",
+    "submitSignin": "Zaloguj się",
+    "successSignup": "Konto utworzone! Sprawdź skrzynkę, aby potwierdzić adres e-mail.",
+    "errorGeneric": "Wystąpił błąd. Spróbuj ponownie.",
+    "errorGoogle": "Logowanie przez Google nie powiodło się."
+  },
+  "upgrade": {
+    "title": "Wybierz swój plan",
+    "currentPlanText": "Obecnie korzystasz z planu:",
+    "freeSubtitle": "Darmowy",
+    "basicSubtitle": "Więcej możliwości",
+    "proSubtitle": "Premium",
+    "perMonth": "msc",
+    "aiLimit": "Limit {{n}} zapytań AI",
+    "aiDaily": "{{n}} zapytań AI dziennie",
+    "basicRoutes": "Podstawowe trasy ({{n}}/d)",
+    "advancedRoutes": "Zaawansowane trasy ({{n}}/d)",
+    "priorityRoutes": "Priorytetowe trasy ({{n}}/d)",
+    "weatherBasic": "Podgląd pogody ({{n}}/d)",
+    "weatherAdvanced": "Dokładna pogoda ({{n}}/d)",
+    "dbQueries": "Zapytania do bazy ({{n}}/d)",
+    "earlyAccess": "Wczesny dostęp do nowości",
+    "dedicatedSupport": "Dedykowane wsparcie ({{n}}/d)",
+    "currentPlan": "Obecny Plan",
+    "select": "Wybierz",
+    "start": "Rozpocznij",
+    "recommendedBadge": "POLECANY"
+  },
+  "map": {
+    "searching": "Wyszukiwanie...",
+    "center": "Centrum"
+  },
+  "footer": {
+    "copyright": "© 2026 LINEUP"
+  },
+  "tabs": {
+    "logistics": "Logistyka",
+    "chat": "Czat",
+    "details": "Szczegóły",
+    "weather": "Pogoda"
+  },
+  "weather": {
+    "title": "Prognoza 5-dniowa",
+    "layerRain": "Mapa opadów",
+    "layerTemp": "Temperatura",
+    "layerWind": "Wiatr",
+    "layerClouds": "Zachmurzenie",
+    "layerNone": "Brak filtru",
+    "noData": "Brak prognozy. Zapytaj Asystenta AI o pogodę dla tego wydarzenia.",
+    "view5Days": "5 Dni",
+    "view24h": "24 Godziny"
+  }
+}

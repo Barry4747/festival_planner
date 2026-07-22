@@ -1,7 +1,10 @@
+import asyncio
 import logging
-from typing import Optional, Any, Dict, List, Union
 import urllib.parse
+from typing import Any, Dict, List, Optional, Union
+
 import httpx
+
 from app.core.config import settings
 
 logger = logging.getLogger("festival_planner.external.events")
@@ -25,30 +28,26 @@ class TicketmasterClient:
 
         # Bezpieczne logowanie parametrów (ukrycie klucza API w logach)
         safe_params = {k: (v if k != "apikey" else "***") for k, v in params.items()}
-        print(f"\n[TICKETMASTER HTTP REQUEST] GET {url} | Params: {safe_params}")
-        logger.info(f"🌐 [TICKETMASTER HTTP REQUEST] GET {url} | Params: {safe_params}")
+        logger.debug("Ticketmaster GET %s | params=%s", url, safe_params)
 
-        # Ticketmaster zazwyczaj nie wymaga spoofingu User-Agent, ale go zostawiamy dla spójności
         async with httpx.AsyncClient(timeout=15.0) as client:
             try:
                 response = await client.get(url, params=params)
-                
-                # Przechwytywanie przekroczenia limitu zapytań (kod 429) z dokumentacji
+
                 if response.status_code == 429:
-                    msg = "Przekroczono limit Ticketmaster API (429 Too Many Requests)."
-                    print(f"[TICKETMASTER HTTP ERROR] {msg}")
-                    logger.warning(msg)
+                    logger.warning("Ticketmaster rate limit exceeded (429) for %s", url)
                     return {"error": "Rate limit exceeded. Please try again later."}
-                    
+
                 response.raise_for_status()
                 data = response.json()
-                print(f"[TICKETMASTER HTTP RESPONSE] Status: {response.status_code} OK | Keys in response: {list(data.keys())}")
-                logger.info(f"🌐 [TICKETMASTER HTTP RESPONSE] Status: {response.status_code} OK")
+                logger.debug("Ticketmaster response %d | keys=%s", response.status_code, list(data.keys()))
                 return data
-            except httpx.HTTPError as e:
-                print(f"[TICKETMASTER HTTP ERROR] {e}")
-                logger.error(f"Błąd Ticketmaster API: {e}")
-                return {"error": str(e)}
+            except httpx.HTTPStatusError as e:
+                logger.error("Ticketmaster HTTP status error: status=%s, url=%s, body=%s", e.response.status_code, url, e.response.text[:200])
+                return {"error": f"Nie udało się pobrać danych z serwisu Ticketmaster (status {e.response.status_code})."}
+            except httpx.RequestError as e:
+                logger.error("Ticketmaster Request error for %s: %s", url, e)
+                return {"error": "Nie udało się połączyć z serwisem Ticketmaster, spróbuj ponownie."}
 
     @staticmethod
     def _format_to_iso8601(date_str: Optional[str], is_end_of_day: bool = False) -> Optional[str]:
@@ -90,10 +89,8 @@ class TicketmasterClient:
         )
 
         if is_europe:
-            import asyncio
             europe_countries = ["PL", "DE", "GB", "FR", "ES", "NL", "CZ"]
-            print(f"[TICKETMASTER] Searching across Europe ({len(europe_countries)} major countries)...")
-            logger.info(f"🌍 [TICKETMASTER] Searching across Europe ({len(europe_countries)} major countries)...")
+            logger.info("Ticketmaster: searching across Europe (%d countries)", len(europe_countries))
             
             sem = asyncio.Semaphore(3)
             async def fetch_for_country(cc: str):
@@ -215,7 +212,14 @@ class SongkickClient:
         url = f"{cls.BASE_URL}/events.json"
         params = {"apikey": settings.SONGKICK_API_KEY, "query": query}
         
-        async with httpx.AsyncClient(timeout=10.0, headers=cls.HEADERS) as client:
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            return response.json()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error("Songkick API HTTP status error: status=%s, query=%s, body=%s", e.response.status_code, query, e.response.text[:200])
+                return {"error": "Nie udało się pobrać danych o wydarzeniach z Songkick, spróbuj ponownie."}
+            except httpx.RequestError as e:
+                logger.error("Songkick API network error for query=%s: %s", query, e)
+                return {"error": "Nie udało się połączyć z serwisem Songkick, spróbuj ponownie."}

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import type { Session } from '@supabase/supabase-js';
+import { api } from '../lib/axios';
 
 interface AuthGuardProps {
   children?: React.ReactNode;
@@ -10,49 +9,41 @@ interface AuthGuardProps {
 
 /**
  * Komponent chroniący ścieżki (Route Guard).
- * Sprawdza obecność aktywnej sesji w Supabase. Jeśli użytkownik jest niezalogowany, przekierowuje na `redirectTo` (domyślnie /login).
+ * Sprawdza obecność aktywnej sesji przez API backendu (HttpOnly cookies). 
+ * Jeśli użytkownik jest niezalogowany, przekierowuje na `redirectTo` (domyślnie /login).
  * Obsługuje zarówno zagnieżdżone routingi (<Outlet />) jak i przekazywanie jako children.
  */
 export const AuthGuard: React.FC<AuthGuardProps> = ({ 
   children, 
   redirectTo = '/login' 
 }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const location = useLocation();
 
   useEffect(() => {
-    // 1. Pobranie początkowego stanu sesji
-    const fetchSession = async () => {
+    let isMounted = true;
+
+    const verifySession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('❌ Błąd pobierania sesji w AuthGuard:', error);
+        await api.get('/api/me');
+        if (isMounted) {
+          setIsAuthenticated(true);
         }
-        setSession(session);
       } catch (err) {
-        console.error('❌ Wyjątek AuthGuard fetchSession:', err);
-      } finally {
-        setLoading(false);
+        if (isMounted) {
+          setIsAuthenticated(false);
+        }
       }
     };
 
-    fetchSession();
-
-    // 2. Nasłuchiwanie na zmiany (np. zalogowanie w innej karcie lub wygaśnięcie tokenu)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, currentSession) => {
-        setSession(currentSession);
-        setLoading(false);
-      }
-    );
+    verifySession();
 
     return () => {
-      subscription.unsubscribe();
+      isMounted = false;
     };
   }, []);
 
-  if (loading) {
+  if (isAuthenticated === null) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-[#090b0a]">
         <div className="flex flex-col items-center gap-4">
@@ -65,7 +56,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
     );
   }
 
-  if (!session) {
+  if (!isAuthenticated) {
     // Przekierowanie z zapamiętaniem ścieżki docelowej
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }

@@ -1,16 +1,20 @@
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 from fastapi import Depends
-from supabase import Client
-from app.db.database import get_supabase_client
+from supabase import Client, create_client
+
+from app.core.config import settings
 from app.core.supabase import get_current_user
+from app.db.database import get_service_supabase_client, get_supabase_client
 from app.repositories import FestivalRepository
 from app.services import (
+    AuthService,
     FestivalAggregator,
-    TicketmasterSource,
-    SupabaseSource,
-    FestivalSuggestionService,
-    FestivalDiscoveryService,
     FestivalConciergeService,
+    FestivalDiscoveryService,
+    FestivalSuggestionService,
+    SupabaseSource,
+    TicketmasterSource,
 )
 
 
@@ -38,8 +42,32 @@ def get_discovery_service(
     return FestivalDiscoveryService(aggregator)
 
 
+def get_authenticated_supabase_client(user: Dict[str, Any] = Depends(get_current_user)) -> Client:
+    client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+    if "access_token" in user:
+        client.postgrest.auth(user["access_token"])
+    return client
+
+
+def get_authenticated_festival_repository(
+    authenticated_client: Client = Depends(get_authenticated_supabase_client),
+    service_client: Client = Depends(get_service_supabase_client),
+) -> FestivalRepository:
+    """
+    Returns an instance of FestivalRepository configured with an authenticated
+    Supabase client scoped to the current user's session.
+    Also injects the service_client for administrative operations like saving AI messages.
+    """
+    return FestivalRepository(client=authenticated_client, service_client=service_client)
+
+
 def get_concierge_service(
-    repository: FestivalRepository = Depends(get_festival_repository),
+    repository: FestivalRepository = Depends(get_authenticated_festival_repository),
 ) -> FestivalConciergeService:
     """FastAPI DI provider for FestivalConciergeService."""
     return FestivalConciergeService(repository)
+
+
+def get_auth_service(client: Client = Depends(get_supabase_client)) -> AuthService:
+    """FastAPI DI provider for AuthService."""
+    return AuthService(client)

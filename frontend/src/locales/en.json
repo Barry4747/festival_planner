@@ -1,0 +1,96 @@
+{
+  "nav": {
+    "logo": "LINEUP",
+    "title": "LINEUP",
+    "get_access": "Get Access",
+    "discover": "Discover",
+    "myTrips": "My Trips",
+    "signedIn": "Signed in as",
+    "signOut": "Sign out"
+  },
+  "hero": {
+    "loading": "LOADING",
+    "subtitle": "Intelligent Festival Discovery",
+    "title_start": "Discover Your ",
+    "title_accent": "Next",
+    "title_end": " Festival",
+    "description": "AI-powered planning. Real-time routes. Curated European lineup.",
+    "button": "Start Planning",
+    "scroll": "Scroll"
+  },
+  "features": {
+    "label": "Platform",
+    "title": "Every tool you need, in one place.",
+    "map_title": "Interactive Map",
+    "map_desc": "Live festival discovery across Europe. Click any pin to start planning.",
+    "ai_title": "BUDDY",
+    "ai_desc": "Chat with an AI that knows your selected festival inside out. Ask anything.",
+    "route_title": "Route Calculator",
+    "route_desc": "Car and train routes with live cost estimates from your city.",
+    "trips_title": "My Trips",
+    "trips_desc": "Bookmark festivals, save plans, and resume right where you left off."
+  },
+  "auth": {
+    "label": "Access",
+    "title": "Create your account",
+    "signup": "Sign Up",
+    "signin": "Sign In",
+    "redirecting": "Redirecting...",
+    "google": "Continue with Google",
+    "orEmail": "or e-mail",
+    "emailLabel": "Email Address",
+    "passwordLabel": "Password",
+    "emailPlaceholder": "raver@rave.com",
+    "submitSignup": "Create Account",
+    "submitSignin": "Sign In",
+    "successSignup": "Account created! Check your inbox to confirm your email.",
+    "errorGeneric": "An error occurred. Please try again.",
+    "errorGoogle": "Google sign-in failed. Please try again."
+  },
+  "upgrade": {
+    "title": "Choose your plan",
+    "currentPlanText": "You are currently on:",
+    "freeSubtitle": "Free",
+    "basicSubtitle": "More features",
+    "proSubtitle": "Premium",
+    "perMonth": "mo",
+    "aiLimit": "Limit of {{n}} AI queries",
+    "aiDaily": "{{n}} AI queries per day",
+    "basicRoutes": "Basic routes ({{n}}/d)",
+    "advancedRoutes": "Advanced routes ({{n}}/d)",
+    "priorityRoutes": "Priority routes ({{n}}/d)",
+    "weatherBasic": "Weather overview ({{n}}/d)",
+    "weatherAdvanced": "Detailed weather ({{n}}/d)",
+    "dbQueries": "Database queries ({{n}}/d)",
+    "earlyAccess": "Early access to new features",
+    "dedicatedSupport": "Dedicated support ({{n}}/d)",
+    "currentPlan": "Current Plan",
+    "select": "Select",
+    "start": "Get Started",
+    "recommendedBadge": "RECOMMENDED"
+  },
+  "map": {
+    "searching": "Searching...",
+    "center": "Center"
+  },
+  "footer": {
+    "copyright": "© 2026 LINEUP"
+  },
+  "tabs": {
+    "logistics": "Logistics",
+    "chat": "Chat",
+    "details": "Details",
+    "weather": "Weather"
+  },
+  "weather": {
+    "title": "5-Day Forecast",
+    "layerRain": "Precipitation Map",
+    "layerTemp": "Temperature Map",
+    "layerWind": "Wind Map",
+    "layerClouds": "Clouds Map",
+    "layerNone": "None",
+    "noData": "No forecast data. Ask the AI Assistant about the weather for this event.",
+    "view5Days": "5 Days",
+    "view24h": "24 Hours"
+  }
+}

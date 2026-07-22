@@ -12,8 +12,9 @@ class FestivalRepository:
     concerning festivals (`local_festivals`) and user suggestions (`festival_suggestions`).
     """
 
-    def __init__(self, client: Client):
+    def __init__(self, client: Client, service_client: Optional[Client] = None):
         self.client = client
+        self.service_client = service_client
 
     def _sync_save_suggestion(
         self,
@@ -128,14 +129,18 @@ class FestivalRepository:
 
     def _sync_create_thread(self, user_id: str, festival_id: str) -> Dict[str, Any]:
         payload = {"user_id": user_id, "festival_id": str(festival_id)}
-        response = self.client.table("threads").insert(payload).execute()
-        rows = (
-            response.data
-            if response and hasattr(response, "data") and isinstance(response.data, list) and len(response.data) > 0
-            else []
-        )
-        if rows:
-            return rows[0]
+        try:
+            response = self.client.table("threads").insert(payload).execute()
+            rows = (
+                response.data
+                if response and hasattr(response, "data") and isinstance(response.data, list) and len(response.data) > 0
+                else []
+            )
+            if rows:
+                return rows[0]
+        except Exception as e:
+            logger.warning("Insert thread failed (possibly concurrent insert/duplicate): %s", e)
+
         existing = self._sync_get_thread_by_user_and_festival(user_id, festival_id)
         return existing or {"user_id": user_id, "festival_id": str(festival_id)}
 
@@ -170,7 +175,11 @@ class FestivalRepository:
         self, thread_id: str, role: str, content: str
     ) -> Dict[str, Any]:
         payload = {"thread_id": str(thread_id), "role": role, "content": content}
-        response = self.client.table("chat_messages").insert(payload).execute()
+        
+        # Use service_role client to bypass RLS when inserting assistant messages
+        client_to_use = self.service_client if role == "assistant" and self.service_client else self.client
+        
+        response = client_to_use.table("chat_messages").insert(payload).execute()
         rows = (
             response.data
             if response and hasattr(response, "data") and isinstance(response.data, list) and len(response.data) > 0

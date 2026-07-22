@@ -1,8 +1,14 @@
+import asyncio
+import json
 import logging
-from typing import Dict, Any, Optional, List
-from langchain_core.messages import HumanMessage, AIMessage
-from app.agents.graph import planner_app
+from typing import Any, AsyncGenerator, Dict, List, Optional
+
+from langchain_core.messages import AIMessage, HumanMessage
+
 from app.repositories import FestivalRepository
+
+# NOTE: planner_app is imported here to resolve circular dependency
+from app.agents.graph import planner_app  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +45,7 @@ class FestivalConciergeService:
         context: Optional[Dict[str, Any]] = None,
         history: Optional[List[Dict[str, Any]]] = None,
         user_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> AsyncGenerator[str, None]:
         messages_list = []
         ctx = festival_context or context or {}
         thread_id = None
@@ -78,32 +84,53 @@ class FestivalConciergeService:
             "messages": messages_list,
             "context": ctx
         }
-        result = await planner_app.ainvoke(initial_state)
-        messages = result.get("messages", [])
-        ai_msg = None
-        for m in reversed(messages):
-            if getattr(m, "type", "") == "ai" or type(m).__name__ == "AIMessage":
-                ai_msg = m
-                break
-        if not ai_msg and messages:
-            ai_msg = messages[-1]
-
-        ai_content = getattr(ai_msg, "content", "") if ai_msg else "I couldn't generate a response."
+        final_ai_msg = ""
+        
+        try:
+            async with asyncio.timeout(15.0):
+                async for event in planner_app.astream_events(
+                    initial_state, 
+                    version="v2", 
+                    config={"recursion_limit": 5}
+                ):
+                    kind = event.get("event")
+                    
+                    if kind == "on_chat_model_stream":
+                        chunk = event["data"]["chunk"].content
+                        if chunk:
+                            if isinstance(chunk, list):
+                                text_chunk = "".join(str(c.get("text", "")) if isinstance(c, dict) else str(c) for c in chunk)
+                            else:
+                                text_chunk = str(chunk)
+                                
+                            if text_chunk:
+                                final_ai_msg += text_chunk
+                                yield f'data: {json.dumps({"type": "token", "content": text_chunk})}\n\n'
+                            
+                    elif kind == "on_tool_start":
+                        tool_name = event.get("name")
+                        yield f'data: {json.dumps({"type": "tool_status", "status": "start", "name": tool_name})}\n\n'
+                        
+                    elif kind == "on_tool_end":
+                        tool_name = event.get("name")
+                        yield f'data: {json.dumps({"type": "tool_status", "status": "end", "name": tool_name})}\n\n'
+                        
+        except asyncio.TimeoutError:
+            logger.error("generate_chat_response: Timeout (15s) podczas strumieniowania.")
+            yield f'data: {json.dumps({"type": "error", "message": "AI aktualnie przeciążone, spróbuj ponownie za chwilę."})}\n\n'
+            return
+        except Exception as e:
+            logger.error(f"generate_chat_response: Błąd: {e}", exc_info=True)
+            yield f'data: {json.dumps({"type": "error", "message": "Wystąpił błąd. Agent nie mógł dokończyć zadania."})}\n\n'
+            return
 
         # 2. Persist new prompt & AI response in entity-bound thread if available
-        if thread_id and self.repository:
+        if thread_id and self.repository and final_ai_msg:
             try:
                 await self.repository.insert_chat_message(str(thread_id), "user", message)
-                await self.repository.insert_chat_message(str(thread_id), "assistant", ai_content)
+                await self.repository.insert_chat_message(str(thread_id), "assistant", final_ai_msg)
             except Exception as e:
                 logger.error(f"⚠️ [FestivalConciergeService] Failed inserting messages to DB: {e}")
-
-        return {
-            "reply": ai_content,
-            "content": ai_content,
-            "context": ctx,
-            "thread_id": thread_id,
-        }
 
     async def generate_trip_itinerary(
         self,
@@ -131,7 +158,16 @@ class FestivalConciergeService:
             "messages": [initial_human_msg],
             "context": context
         }
-        result = await planner_app.ainvoke(initial_state)
+        try:
+            async with asyncio.timeout(30.0):
+                result = await planner_app.ainvoke(initial_state, config={"recursion_limit": 5})
+        except asyncio.TimeoutError:
+            logger.error("generate_trip_itinerary: Timeout (30s) podczas generowania planu wyjazdu.")
+            return {
+                "content": "AI jest aktualnie przeciążone, spróbuj ponownie za chwilę. (Przekroczono limit czasu 30s)",
+                "discovered_festivals": [],
+                "raw_festivals": []
+            }
         messages = result.get("messages", [])
         ai_msg = None
         for m in reversed(messages):
@@ -142,6 +178,18 @@ class FestivalConciergeService:
             ai_msg = messages[-1]
 
         ai_content = getattr(ai_msg, "content", "") if ai_msg else "No itinerary generated."
+        if isinstance(ai_content, list):
+            texts = []
+            for item in ai_content:
+                if isinstance(item, dict) and "text" in item:
+                    texts.append(str(item["text"]))
+                elif isinstance(item, str):
+                    texts.append(item)
+                else:
+                    texts.append(str(item))
+            ai_content = "\n".join(texts)
+        elif not isinstance(ai_content, str):
+            ai_content = str(ai_content)
 
         raw_festivals = result.get("discovered_festivals", [])
         formatted_festivals = []
