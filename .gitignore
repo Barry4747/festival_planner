@@ -99,3 +99,8 @@ Desktop.ini
 *.sw?
 *.swo
 *.swp
+
+# =========================
+# Exceptions
+# =========================
+!frontend/src/lib/
