@@ -121,10 +121,10 @@ jobs:
             docker image prune -f
 
             # 7. Health Check Verification Loop (Retry 15 times every 2s)
-            echo "Verifying backend health on http://localhost:8000/api/health..."
+            echo "Verifying backend health on http://localhost:8000/health..."
             HEALTH_OK=0
             for i in $(seq 1 15); do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health || true)
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || true)
               if [ "$STATUS" = "200" ]; then
                 echo "✅ Health check passed: 200 OK"
                 HEALTH_OK=1
