@@ -30,7 +30,7 @@ def _get_user_id(user: Dict[str, Any]) -> str:
     return str(user_id)
 
 
-@router.get("/", response_model=List[Dict[str, Any]])
+@router.get("", response_model=List[Dict[str, Any]])
 async def get_trips(
     user: Dict[str, Any] = Depends(get_current_user),
     supabase: Client = Depends(get_supabase_client),
@@ -54,7 +54,7 @@ async def get_trips(
         )
 
 
-@router.post("/", response_model=Dict[str, str])
+@router.post("", response_model=Dict[str, str])
 async def save_trip(
     trip: TripRequest,
     user: Dict[str, Any] = Depends(get_current_user),

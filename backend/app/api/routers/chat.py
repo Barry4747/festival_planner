@@ -52,7 +52,7 @@ async def get_chat_status() -> Dict[str, Any]:
     """Check if AI chat is currently enabled."""
     return {"enabled": settings.ai_chat_enabled}
 
-@router.post("/")
+@router.post("")
 async def chat_endpoint(
     request: FestivalChatRequest,
     _chat_enabled: None = Depends(verify_chat_enabled),
