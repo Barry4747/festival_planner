@@ -27,11 +27,11 @@ resource "aws_security_group" "lineup_sg" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    description = "SSH only from my IP"
+    description = "SSH from anywhere (required for GH Actions)"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.my_ip_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
