@@ -8,16 +8,10 @@ services:
     restart: always
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      target: production
+    image: ghcr.io/barry4747/festival_planner-backend:${IMAGE_TAG:-latest}
     container_name: lineup-backend-prod
     ports:
       - "8000:8000"
-    env_file:
-      - path: ./backend/.env.prod
-        required: false
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - FRONTEND_URL=${FRONTEND_URL}
@@ -37,16 +31,10 @@ services:
     restart: always
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production
+    image: ghcr.io/barry4747/festival_planner-frontend:${IMAGE_TAG:-latest}
     container_name: lineup-frontend-prod
     ports:
       - "80:80"
-    env_file:
-      - path: ./frontend/.env.prod
-        required: false
     environment:
       - VITE_API_URL=${VITE_API_URL}
       - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-${SUPABASE_URL}}

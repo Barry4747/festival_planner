@@ -1,0 +1,126 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Images to GHCR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: production
+          push: true
+          tags: |
+            ghcr.io/barry4747/festival_planner-backend:latest
+            ghcr.io/barry4747/festival_planner-backend:${{ github.sha }}
+
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          target: production
+          build-args: |
+            VITE_API_URL=${{ secrets.PROD_VITE_API_URL }}
+            VITE_SUPABASE_URL=${{ secrets.PROD_VITE_SUPABASE_URL }}
+            VITE_SUPABASE_ANON_KEY=${{ secrets.PROD_VITE_SUPABASE_ANON_KEY }}
+          push: true
+          tags: |
+            ghcr.io/barry4747/festival_planner-frontend:latest
+            ghcr.io/barry4747/festival_planner-frontend:${{ github.sha }}
+
+  deploy:
+    name: Deploy to Production EC2
+    needs: build-and-push
+    if: ${{ always() && needs.build-and-push.result == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Execute Remote SSH Deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+
+            # 1. Log in to GHCR on the production server
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # 2. Navigate to project root on production server
+            cd ~/festival_planner || cd /app || cd .
+
+            # 3. Create temporary production .env file with current commit SHA tag
+            cat << 'EOF' > .env
+            IMAGE_TAG=${{ github.sha }}
+            ENVIRONMENT=production
+            FRONTEND_URL=${{ secrets.PROD_FRONTEND_URL }}
+            ALLOWED_ORIGINS=${{ secrets.PROD_ALLOWED_ORIGINS }}
+            SUPABASE_URL=${{ secrets.PROD_SUPABASE_URL }}
+            SUPABASE_KEY=${{ secrets.PROD_SUPABASE_KEY }}
+            SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
+            DATABASE_URL=${{ secrets.PROD_DATABASE_URL }}
+            GEMINI_API_KEY=${{ secrets.PROD_GEMINI_API_KEY }}
+            GEMINI_MODEL=gemini-3.1-flash-lite
+            TICKETMASTER_API_KEY=${{ secrets.PROD_TICKETMASTER_API_KEY }}
+            GOOGLE_MAPS_API_KEY=${{ secrets.PROD_GOOGLE_MAPS_API_KEY }}
+            OPENWEATHER_API_KEY=${{ secrets.PROD_OPENWEATHER_API_KEY }}
+            VITE_API_URL=${{ secrets.PROD_VITE_API_URL }}
+            VITE_SUPABASE_URL=${{ secrets.PROD_VITE_SUPABASE_URL }}
+            VITE_SUPABASE_ANON_KEY=${{ secrets.PROD_VITE_SUPABASE_ANON_KEY }}
+            EOF
+
+            # 4. Pull specific commit images & restart services
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # 5. Clean up temporary secret .env file
+            rm -f .env
+
+            # 6. Prune old unused docker images
+            docker image prune -f
+
+            # 7. Health Check Verification Loop (Retry 15 times every 2s)
+            echo "Verifying backend health on http://localhost:8000/api/health..."
+            HEALTH_OK=0
+            for i in $(seq 1 15); do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health || true)
+              if [ "$STATUS" = "200" ]; then
+                echo "✅ Health check passed: 200 OK"
+                HEALTH_OK=1
+                break
+              fi
+              echo "Waiting for container startup (attempt $i/15, status: $STATUS)..."
+              sleep 2
+            done
+
+            if [ "$HEALTH_OK" -ne 1 ]; then
+              echo "❌ Health check failed after 30 seconds! Deployment failed."
+              exit 1
+            fi
