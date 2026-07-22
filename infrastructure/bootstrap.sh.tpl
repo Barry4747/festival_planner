@@ -31,7 +31,12 @@ dnf install -y nginx certbot python3-certbot-nginx
 
 # Oczekujemy aż EIP zostanie przypisane do uruchomionej instancji (wymagane by DNS .nip.io zadziałał)
 echo "Czekam na faktyczne podpięcie Elastic IP do instancji..."
-while ! curl -s http://169.254.169.254/latest/meta-data/public-ipv4 | grep -q "$EIP"; do
+while true; do
+  TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" || true)
+  CURRENT_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4 || true)
+  if [ "$CURRENT_IP" == "$EIP" ]; then
+    break
+  fi
   sleep 5
 done
 echo "Elastic IP podpięte, można generować certyfikat..."
