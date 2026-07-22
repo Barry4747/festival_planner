@@ -6,6 +6,13 @@ services:
     volumes:
       - redis_data_prod:/data
     restart: always
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-central-1
+        awslogs-group: /festival-planner/prod
+        awslogs-stream: redis
+        awslogs-create-group: "true"
 
   backend:
     image: ghcr.io/barry4747/festival_planner-backend:${IMAGE_TAG:-latest}
@@ -29,6 +36,13 @@ services:
     depends_on:
       - redis
     restart: always
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-central-1
+        awslogs-group: /festival-planner/prod
+        awslogs-stream: backend
+        awslogs-create-group: "true"
 
   frontend:
     image: ghcr.io/barry4747/festival_planner-frontend:${IMAGE_TAG:-latest}
@@ -42,6 +56,13 @@ services:
     depends_on:
       - backend
     restart: always
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: eu-central-1
+        awslogs-group: /festival-planner/prod
+        awslogs-stream: frontend
+        awslogs-create-group: "true"
 
 volumes:
   redis_data_prod:
