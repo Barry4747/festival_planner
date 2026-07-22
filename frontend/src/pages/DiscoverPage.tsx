@@ -6,7 +6,7 @@ import { DiscoveryMap, type FestivalItem } from '../components/DiscoveryMap';
 import { AIChat } from '../components/AIChat';
 import { WeatherPanel } from '../components/WeatherPanel';
 import { LogisticsPanel } from '../components/LogisticsPanel';
-import { Bookmark, BookmarkCheck, ExternalLink, MapPin, Calendar, Tag, Loader2, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ExternalLink, MapPin, Calendar, Tag, Loader2, X } from 'lucide-react';
 import { usePlannerStore } from '../store/usePlannerStore';
 import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
