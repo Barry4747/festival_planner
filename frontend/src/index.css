@@ -90,3 +90,17 @@ body {
 }
 .leaflet-popup-tip { background: #1E1E1E !important; }
 .leaflet-popup-close-button { color: #A1A1AA !important; }
+
+/* ===== MOBILE SAFE AREA & LEAFLET ADJUSTMENTS ===== */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (max-width: 768px) {
+  /* Push Leaflet controls above the Floating Pill Toggle / Bottom Sheet */
+  .leaflet-bottom {
+    margin-bottom: 140px !important;
+  }
+}
