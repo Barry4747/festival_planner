@@ -94,8 +94,6 @@ jobs:
             cat << 'EOF' > .env
             IMAGE_TAG=${{ github.sha }}
             ENVIRONMENT=production
-            FRONTEND_URL=${{ secrets.PROD_FRONTEND_URL }}
-            ALLOWED_ORIGINS=${{ secrets.PROD_ALLOWED_ORIGINS }}
             SUPABASE_URL=${{ secrets.PROD_SUPABASE_URL }}
             SUPABASE_KEY=${{ secrets.PROD_SUPABASE_KEY }}
             SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
@@ -105,10 +103,15 @@ jobs:
             TICKETMASTER_API_KEY=${{ secrets.PROD_TICKETMASTER_API_KEY }}
             GOOGLE_MAPS_API_KEY=${{ secrets.PROD_GOOGLE_MAPS_API_KEY }}
             OPENWEATHER_API_KEY=${{ secrets.PROD_OPENWEATHER_API_KEY }}
-            VITE_API_URL=${{ secrets.PROD_VITE_API_URL }}
             VITE_SUPABASE_URL=${{ secrets.PROD_VITE_SUPABASE_URL }}
             VITE_SUPABASE_ANON_KEY=${{ secrets.PROD_VITE_SUPABASE_ANON_KEY }}
             EOF
+
+            DOMAIN=$(echo "${{ secrets.SERVER_HOST }}" | tr '.' '-').nip.io
+            echo "DOMAIN=$DOMAIN" >> .env
+            echo "FRONTEND_URL=https://$DOMAIN" >> .env
+            echo "ALLOWED_ORIGINS=https://$DOMAIN" >> .env
+            echo "VITE_API_URL=https://$DOMAIN/api" >> .env
 
             # 4. Pull specific commit images & restart services
             docker compose -f docker-compose.prod.yml pull
