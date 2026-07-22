@@ -51,7 +51,7 @@ jobs:
           file: ./frontend/Dockerfile
           target: production
           build-args: |
-            VITE_API_URL=https://${{ env.DOMAIN }}/api
+            VITE_API_URL=https://${{ env.DOMAIN }}
             VITE_SUPABASE_URL=${{ secrets.PROD_SUPABASE_URL }}
             VITE_SUPABASE_ANON_KEY=${{ secrets.PROD_SUPABASE_KEY }}
           push: true
@@ -116,7 +116,7 @@ jobs:
             echo "DOMAIN=$DOMAIN" >> .env
             echo "FRONTEND_URL=https://$DOMAIN" >> .env
             echo "ALLOWED_ORIGINS=https://$DOMAIN" >> .env
-            echo "VITE_API_URL=https://$DOMAIN/api" >> .env
+            echo "VITE_API_URL=https://$DOMAIN" >> .env
 
             # 4. Pull specific commit images & restart services
             docker compose -f docker-compose.prod.yml pull
