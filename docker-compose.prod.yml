@@ -18,7 +18,7 @@ services:
     image: ghcr.io/barry4747/festival_planner-backend:${IMAGE_TAG:-latest}
     container_name: lineup-backend-prod
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - FRONTEND_URL=${FRONTEND_URL}
@@ -49,6 +49,10 @@ services:
     container_name: lineup-frontend-prod
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt/live/${DOMAIN}/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
+      - /etc/letsencrypt/live/${DOMAIN}/privkey.pem:/etc/nginx/ssl/privkey.pem:ro
     environment:
       - VITE_API_URL=${VITE_API_URL}
       - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-${SUPABASE_URL}}
