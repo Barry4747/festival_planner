@@ -39,6 +39,11 @@ jobs:
             ghcr.io/barry4747/festival_planner-backend:latest
             ghcr.io/barry4747/festival_planner-backend:${{ github.sha }}
 
+      - name: Compute Domain for Frontend Build
+        run: |
+          DOMAIN=$(echo "${{ secrets.SERVER_HOST }}" | tr '.' '-').nip.io
+          echo "DOMAIN=$DOMAIN" >> $GITHUB_ENV
+
       - name: Build and Push Frontend Image
         uses: docker/build-push-action@v6
         with:
@@ -46,9 +51,9 @@ jobs:
           file: ./frontend/Dockerfile
           target: production
           build-args: |
-            VITE_API_URL=${{ secrets.PROD_VITE_API_URL }}
-            VITE_SUPABASE_URL=${{ secrets.PROD_VITE_SUPABASE_URL }}
-            VITE_SUPABASE_ANON_KEY=${{ secrets.PROD_VITE_SUPABASE_ANON_KEY }}
+            VITE_API_URL=https://${{ env.DOMAIN }}/api
+            VITE_SUPABASE_URL=${{ secrets.PROD_SUPABASE_URL }}
+            VITE_SUPABASE_ANON_KEY=${{ secrets.PROD_SUPABASE_KEY }}
           push: true
           tags: |
             ghcr.io/barry4747/festival_planner-frontend:latest
