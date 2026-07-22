@@ -1,16 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, EmailStr
 from app.services.auth_service import AuthService
 from app.dependencies import get_auth_service
+from app.schemas.auth import EmailPasswordRequest
 import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-class EmailPasswordRequest(BaseModel):
-    email: EmailStr
-    password: str
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str, max_age: int = 31536000):
     response.set_cookie(

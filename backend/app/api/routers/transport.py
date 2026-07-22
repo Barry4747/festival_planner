@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Query
 
 from app.core.rate_limit import check_rate_limit
+from app.core.supabase import get_current_user
 from app.services.transport import (
     geocode_city,
     get_car_route,
@@ -24,6 +25,7 @@ async def get_transport_routes(
     dest_lng: float = Query(..., description="Destination longitude"),
     date: str = Query(..., description="Departure date YYYY-MM-DD"),
     dest_name: Optional[str] = Query(None, description="Optional destination city or festival name"),
+    user: Dict[str, Any] = Depends(get_current_user),
     _rate_limit: dict = Depends(check_rate_limit("google_maps")),
 ) -> Dict[str, Any]:
     """Calculate driving (OSRM) and transit (Google Directions) routes from an

@@ -30,13 +30,7 @@ export const AuthSection: React.FC<AuthSectionProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const baseRedirect =
-    import.meta.env.VITE_AUTH_REDIRECT_URL ||
-    import.meta.env.VITE_APP_URL ||
-    window.location.origin;
-  const redirectTo = baseRedirect.endsWith('/discover') || baseRedirect.endsWith('/discover/')
-    ? baseRedirect
-    : `${baseRedirect.replace(/\/+$/, '')}/discover`;
+
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,8 +58,9 @@ export const AuthSection: React.FC<AuthSectionProps> = ({
     setGoogleLoading(true);
     setError(null);
     try {
+      const backendCallbackUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/auth/callback?next=${encodeURIComponent(window.location.origin + '/discover')}`;
       const { data } = await api.get('/api/auth/google', {
-        params: { redirect_to: redirectTo }
+        params: { redirect_to: backendCallbackUrl }
       });
       if (data?.url) {
         window.location.href = data.url;

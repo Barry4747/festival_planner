@@ -1,6 +1,12 @@
+import json
+import logging
 from typing import List, Optional, Union
+
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "LINEUP"
@@ -17,7 +23,6 @@ class Settings(BaseSettings):
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",") if i.strip()]
         elif isinstance(v, str):
-            import json
             return json.loads(v)
         return v
 
@@ -25,9 +30,13 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str
     SUPABASE_SERVICE_ROLE_KEY: str
     DATABASE_URL: str
-    GEMINI_API_KEY: str
+    GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-3.1-flash-lite"
     REDIS_URL: str = "redis://localhost:6379"
+    
+    @property
+    def ai_chat_enabled(self) -> bool:
+        return bool(self.GEMINI_API_KEY)
 
     # Weather API
     OPENWEATHER_API_KEY: Optional[str] = None
@@ -56,17 +65,36 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self):
+        critical_fields = [
+            "TICKETMASTER_API_KEY",
+            "OPENWEATHER_API_KEY",
+            "GOOGLE_MAPS_API_KEY",
+            "SUPABASE_SERVICE_ROLE_KEY",
+        ]
+        
+        missing = []
+        for field in critical_fields:
+            if not getattr(self, field):
+                missing.append(field)
+                
+        has_invalid_origins = not self.ALLOWED_ORIGINS or "http://localhost:5173" in self.ALLOWED_ORIGINS
+
         if self.ENVIRONMENT == "production":
-            # Fail-fast for missing ALLOWED_ORIGINS in production
-            if not self.ALLOWED_ORIGINS or "http://localhost:5173" in self.ALLOWED_ORIGINS:
-                raise ValueError("ALLOWED_ORIGINS musi być ustawione dla środowiska produkcyjnego (i nie może to być localhost)")
+            if has_invalid_origins:
+                missing.append("ALLOWED_ORIGINS (musi być produkcyjną domeną, bez localhost)")
             
-            # Fail-fast for other critical services as per code review
-            if not self.TICKETMASTER_API_KEY:
-                raise ValueError("TICKETMASTER_API_KEY jest wymagane w środowisku produkcyjnym")
-            
-            if not self.SUPABASE_SERVICE_ROLE_KEY:
-                raise ValueError("SUPABASE_SERVICE_ROLE_KEY jest wymagane w środowisku produkcyjnym")
+            if missing:
+                raise ValueError(
+                    f"Brak krytycznych zmiennych konfiguracyjnych w środowisku produkcyjnym! "
+                    f"Aplikacja nie wystartuje. Uzupełnij: {', '.join(missing)}"
+                )
+        else:
+            # Nie-produkcyjne środowiska: logujemy warning zamiast rzucać wyjątek
+            if missing:
+                logger.warning(
+                    f"Ostrzeżenie (dev): Brak kluczy API, część funkcji Agenta zwróci błędy: {', '.join(missing)}"
+                )
+        
         return self
 
 settings = Settings()

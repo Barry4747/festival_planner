@@ -1,7 +1,10 @@
 import asyncio
-import math
 import logging
-from typing import List, Dict, Any, Optional
+import math
+from typing import Any, Dict, List, Optional
+
+from app.db import get_supabase_client
+from app.repositories import FestivalRepository
 from .base import BaseFestivalSource
 
 logger = logging.getLogger(__name__)
@@ -36,9 +39,6 @@ class SupabaseSource(BaseFestivalSource):
         start_date: Optional[str] = None,
         end_date: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        from app.db import get_supabase_client
-        from app.repositories import FestivalRepository
-
         client = get_supabase_client()
         repo = FestivalRepository(client)
 

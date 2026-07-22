@@ -2,7 +2,7 @@ TIER_CONFIG = {
     "FREE": {
         "name": "Free",
         "limits": {
-            "ai_agent": {"rpm": 0, "rpd": 5},
+            "ai_agent": {"rpm": 10, "rpd": 25},
             "google_maps": {"rpm": 10, "rpd": 50},
             "ticketmaster": {"rpm": 15, "rpd": 100},
             "weather": {"rpm": 10, "rpd": 30}

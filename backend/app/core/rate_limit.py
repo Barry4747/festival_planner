@@ -18,30 +18,12 @@ from app.core.config import settings
 from app.core.supabase import get_current_user
 from app.core.tiers import TIER_CONFIG
 from app.db.database import get_supabase_client
+from app.exceptions import RateLimitException
 
 logger = logging.getLogger(__name__)
 
 # Initialize Redis client pool
 redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
-
-
-class RateLimitException(Exception):
-    def __init__(self, tier_name: str, service: str, message: str) -> None:
-        self.tier_name = tier_name
-        self.service = service
-        self.message = message
-
-
-async def rate_limit_exception_handler(request: Request, exc: RateLimitException) -> JSONResponse:
-    return JSONResponse(
-        status_code=429,
-        content={
-            "error": "rate_limit_exceeded",
-            "tier": exc.tier_name,
-            "service": exc.service,
-            "message": exc.message,
-        },
-    )
 
 
 async def get_user_tier(user_id: str, supabase: Client) -> str:

@@ -1,7 +1,10 @@
+import asyncio
 import logging
-from typing import Optional, Any, Dict, List, Union
 import urllib.parse
+from typing import Any, Dict, List, Optional, Union
+
 import httpx
+
 from app.core.config import settings
 
 logger = logging.getLogger("festival_planner.external.events")
@@ -39,9 +42,12 @@ class TicketmasterClient:
                 data = response.json()
                 logger.debug("Ticketmaster response %d | keys=%s", response.status_code, list(data.keys()))
                 return data
-            except httpx.HTTPError as e:
-                logger.error("Ticketmaster HTTP error: %s", e)
-                return {"error": str(e)}
+            except httpx.HTTPStatusError as e:
+                logger.error("Ticketmaster HTTP status error: status=%s, url=%s, body=%s", e.response.status_code, url, e.response.text[:200])
+                return {"error": f"Nie udało się pobrać danych z serwisu Ticketmaster (status {e.response.status_code})."}
+            except httpx.RequestError as e:
+                logger.error("Ticketmaster Request error for %s: %s", url, e)
+                return {"error": "Nie udało się połączyć z serwisem Ticketmaster, spróbuj ponownie."}
 
     @staticmethod
     def _format_to_iso8601(date_str: Optional[str], is_end_of_day: bool = False) -> Optional[str]:
@@ -83,7 +89,6 @@ class TicketmasterClient:
         )
 
         if is_europe:
-            import asyncio
             europe_countries = ["PL", "DE", "GB", "FR", "ES", "NL", "CZ"]
             logger.info("Ticketmaster: searching across Europe (%d countries)", len(europe_countries))
             
@@ -207,7 +212,14 @@ class SongkickClient:
         url = f"{cls.BASE_URL}/events.json"
         params = {"apikey": settings.SONGKICK_API_KEY, "query": query}
         
-        async with httpx.AsyncClient(timeout=10.0, headers=cls.HEADERS) as client:
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            return response.json()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error("Songkick API HTTP status error: status=%s, query=%s, body=%s", e.response.status_code, query, e.response.text[:200])
+                return {"error": "Nie udało się pobrać danych o wydarzeniach z Songkick, spróbuj ponownie."}
+            except httpx.RequestError as e:
+                logger.error("Songkick API network error for query=%s: %s", query, e)
+                return {"error": "Nie udało się połączyć z serwisem Songkick, spróbuj ponownie."}

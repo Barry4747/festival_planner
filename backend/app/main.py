@@ -12,10 +12,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import chat_router, planner_router, transport_router, trips_router, auth_router
 from app.core.config import settings
-from app.core.rate_limit import RateLimitException, rate_limit_exception_handler
 from app.core.supabase import get_current_user
 from app.core.tiers import TIER_CONFIG
 from app.db import init_db
+from app.exceptions import (
+    RateLimitException,
+    rate_limit_exception_handler,
+    ChatUnavailableException,
+    chat_unavailable_exception_handler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +40,7 @@ app = FastAPI(
 )
 
 app.add_exception_handler(RateLimitException, rate_limit_exception_handler)
+app.add_exception_handler(ChatUnavailableException, chat_unavailable_exception_handler)
 
 # CORS — origins, methods and headers are explicitly constrained.
 # ALLOWED_ORIGINS is loaded from the ALLOWED_ORIGINS env variable (see config.py).

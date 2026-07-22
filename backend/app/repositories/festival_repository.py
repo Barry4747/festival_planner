@@ -129,14 +129,18 @@ class FestivalRepository:
 
     def _sync_create_thread(self, user_id: str, festival_id: str) -> Dict[str, Any]:
         payload = {"user_id": user_id, "festival_id": str(festival_id)}
-        response = self.client.table("threads").insert(payload).execute()
-        rows = (
-            response.data
-            if response and hasattr(response, "data") and isinstance(response.data, list) and len(response.data) > 0
-            else []
-        )
-        if rows:
-            return rows[0]
+        try:
+            response = self.client.table("threads").insert(payload).execute()
+            rows = (
+                response.data
+                if response and hasattr(response, "data") and isinstance(response.data, list) and len(response.data) > 0
+                else []
+            )
+            if rows:
+                return rows[0]
+        except Exception as e:
+            logger.warning("Insert thread failed (possibly concurrent insert/duplicate): %s", e)
+
         existing = self._sync_get_thread_by_user_and_festival(user_id, festival_id)
         return existing or {"user_id": user_id, "festival_id": str(festival_id)}
 

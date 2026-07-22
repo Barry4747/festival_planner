@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Tuple
 import httpx
 import polyline
 
+from app.core.config import settings
 from app.core.geo_constants import CITY_COORDS
 
 logger = logging.getLogger("festival_planner.services.transport")
@@ -166,7 +167,6 @@ async def get_google_directions(
     clean_origin = origin.split('|')[0].replace('pass', '').replace('2-day', '').strip() if origin else origin
     clean_destination = destination.split('|')[0].replace('pass', '').replace('2-day', '').strip() if destination else destination
 
-    from app.core.config import settings
     api_key = settings.GOOGLE_MAPS_API_KEY
     if not api_key:
         logger.error("❌ [get_google_directions] Missing GOOGLE_MAPS_API_KEY in configuration.")
@@ -187,7 +187,7 @@ async def get_google_directions(
                 logger.warning(f"⚠️ [get_google_directions] HTTP {resp.status_code}: {resp.text}")
                 return {"status": "error", "message": "Google Directions API is temporarily unavailable."}
             data = resp.json()
-            logger.warning(f"data: {data}")
+            logger.debug("Google Directions raw response: %s", data)
             if data.get("status") != "OK" or not data.get("routes"):
                 err_status = data.get("status", "Unknown Error")
                 logger.warning(f"⚠️ [get_google_directions] API returned {err_status} for {origin} to {destination}")

@@ -1,9 +1,12 @@
 import asyncio
+from datetime import datetime
 import logging
 import math
-from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from thefuzz import fuzz
+
+from app.services.festival_sources import SupabaseSource, TicketmasterSource
 from app.services.festival_sources.base import BaseFestivalSource
 
 logger = logging.getLogger(__name__)
@@ -49,7 +52,6 @@ class FestivalAggregator:
 
     def __init__(self, sources: Optional[List[BaseFestivalSource]] = None):
         if sources is None:
-            from app.services.festival_sources import TicketmasterSource, SupabaseSource
             sources = [TicketmasterSource(), SupabaseSource()]
         self.sources = sources
 

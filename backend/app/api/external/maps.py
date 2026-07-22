@@ -34,6 +34,13 @@ class GoogleMapsClient:
         }
         
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url, params=params)
-            response.raise_for_status()
-            return response.json()
+            try:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error("Google Maps API HTTP status error: status=%s, origin=%s, destination=%s, body=%s", e.response.status_code, origin, destination, e.response.text[:200])
+                return {"error": "Nie udało się pobrać danych o trasie, spróbuj ponownie."}
+            except httpx.RequestError as e:
+                logger.error("Google Maps API network error for origin=%s to destination=%s: %s", origin, destination, e)
+                return {"error": "Nie udało się połączyć z serwisem Google Maps, spróbuj ponownie."}

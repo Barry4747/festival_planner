@@ -1,9 +1,8 @@
-"""Planner router — festival discovery, weather, and legacy plan-trip endpoints."""
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Query
+from langgraph.errors import GraphRecursionError
 
 from app.core.rate_limit import check_rate_limit
 from app.core.supabase import get_current_user
@@ -13,44 +12,20 @@ from app.dependencies import (
     get_suggestion_service,
 )
 from app.schemas.chat import BaseChatRequest  # noqa: F401 — re-exported for legacy use
+from app.schemas.planner import (
+    SuggestFestivalRequest,
+    TripDetailsModel,
+    UserPreferencesModel,
+)
 from app.services import (
     FestivalConciergeService,
     FestivalDiscoveryService,
     FestivalSuggestionService,
 )
-from app.services.weather import fetch_weather
-from langgraph.errors import GraphRecursionError
-from fastapi import HTTPException
+from app.services.weather import fetch_current_weather, fetch_weather
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-# ---------------------------------------------------------------------------
-# Pydantic models local to the planner
-# ---------------------------------------------------------------------------
-
-
-class TripDetailsModel(BaseModel):
-    festival_name: str
-    start_date: str
-    end_date: str
-    location: str
-
-
-class UserPreferencesModel(BaseModel):
-    budget: float
-    travel_from: str
-    music_genres: List[str] = Field(default_factory=list)
-
-
-class SuggestFestivalRequest(BaseModel):
-    suggested_name: str = Field(..., min_length=1, max_length=255)
-    suggested_city: str = Field(..., min_length=1, max_length=255)
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    # NOTE: user_id is intentionally NOT accepted from the request body.
-    # It is extracted from the verified JWT token in the handler below.
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +37,7 @@ class SuggestFestivalRequest(BaseModel):
 async def get_weather(
     city: str,
     date: Optional[str] = None,
+    user: Dict[str, Any] = Depends(get_current_user),
     _rate_limit: dict = Depends(check_rate_limit("weather")),
 ):
     """Fetch weather forecast for a city."""
@@ -72,11 +48,10 @@ async def get_weather(
 async def get_current_weather(
     lat: float,
     lon: float,
+    user: Dict[str, Any] = Depends(get_current_user),
     _rate_limit: dict = Depends(check_rate_limit("weather")),
 ):
     """Fetch current weather conditions by coordinates."""
-    from app.services.weather import fetch_current_weather
-
     return await fetch_current_weather(lat=lat, lon=lon)
 
 
@@ -108,6 +83,7 @@ async def get_festivals_map(
     radius_km: int = Query(50, ge=1, le=2000, description="Search radius in km"),
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    user: Dict[str, Any] = Depends(get_current_user),
     service: FestivalDiscoveryService = Depends(get_discovery_service),
     _rate_limit: dict = Depends(check_rate_limit("ticketmaster")),
 ) -> List[Dict[str, Any]]:

@@ -35,6 +35,13 @@ class BookingClient:
             params["price_max"] = max_price
 
         async with httpx.AsyncClient(timeout=12.0) as client:
-            response = await client.get(url, headers=headers, params=params)
-            response.raise_for_status()
-            return response.json()
+            try:
+                response = await client.get(url, headers=headers, params=params)
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error("Booking API HTTP status error: status=%s, url=%s, body=%s", e.response.status_code, url, e.response.text[:200])
+                return {"error": "Nie udało się pobrać danych o hotelach, spróbuj ponownie."}
+            except httpx.RequestError as e:
+                logger.error("Booking API network error for %s: %s", url, e)
+                return {"error": "Nie udało się połączyć z serwisem Booking.com, spróbuj ponownie."}

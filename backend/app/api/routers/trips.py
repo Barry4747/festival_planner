@@ -13,15 +13,10 @@ from supabase import Client
 
 from app.core.supabase import get_current_user
 from app.db.database import get_supabase_client
+from app.schemas.trips import TripRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-class TripRequest(BaseModel):
-    festival_id: str = Field(..., min_length=1)
-    festival_name: str = Field(..., min_length=1, max_length=255)
-    festival_data: Dict[str, Any]
 
 
 def _get_user_id(user: Dict[str, Any]) -> str:
